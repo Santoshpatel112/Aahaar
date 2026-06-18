@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 
 import Navbar from './components/Navbar';
 import Toast from './components/Toast';
+import Chatbot from './components/Chatbot';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 
@@ -13,6 +14,7 @@ import DonorDashboard from './pages/DonorDashboard';
 import CreateDonation from './pages/CreateDonation';
 import AdminDashboard from './pages/AdminDashboard';
 import NgoRegistration from './pages/NgoRegistration';
+import NgoDashboard from './pages/NgoDashboard';
 import StatsPage from './pages/StatsPage';
 import AboutPage from './pages/AboutPage';
 
@@ -55,11 +57,20 @@ function AppRoutes() {
             </AdminRoute>
           }
         />
+        <Route
+          path="/ngo-dashboard"
+          element={
+            <ProtectedRoute>
+              <NgoDashboard />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toast />
+      <Chatbot />
     </>
   );
 }
