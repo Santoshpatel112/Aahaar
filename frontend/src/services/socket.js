@@ -32,6 +32,15 @@ export const connectSocket = (userId) => {
     window.dispatchEvent(event);
   });
 
+  // Handle forced logout initiated by server (e.g., account deleted)
+  socket.on('force-logout', (payload) => {
+    console.log('Received force-logout event:', payload);
+    showToast('Your account session was ended. Redirecting to home...', 'error');
+    // Notify app to perform logout and redirect
+    const event = new CustomEvent('force-logout', { detail: payload });
+    window.dispatchEvent(event);
+  });
+
   socket.on('disconnect', (reason) => {
     console.log('Socket disconnected:', reason);
   });

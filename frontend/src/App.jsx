@@ -1,5 +1,5 @@
 import { useContext, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 
@@ -31,33 +31,43 @@ import './index.css';
 import './App.css';
 
 function AppRoutes() {
-  const { user, refreshUser } = useContext(AuthContext);
+  const { user, refreshUser, logout } = useContext(AuthContext);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   // Refresh user profile once on app mount if user exists
   useEffect(() => {
-    if (user && user._id && refreshUser) {
-      refreshUser();
-    }
+    if (user && user._id && refreshUser) refreshUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshUser]);
+
+  // Force-logout handler (triggered by socket -> dispatches window event)
+  useEffect(() => {
+    const handleLogoutEvent = (e) => {
+      if (logout) logout();
+      try { navigate('/', { replace: true }); } catch { window.location = '/'; }
+    };
+    window.addEventListener('force-logout', handleLogoutEvent);
+    window.addEventListener('auth-unauthorized', handleLogoutEvent);
+    return () => {
+      window.removeEventListener('force-logout', handleLogoutEvent);
+      window.removeEventListener('auth-unauthorized', handleLogoutEvent);
+    };
+  }, [logout, navigate]);
 
   // Listen for socket notification events to trigger real-time verification updates
   useEffect(() => {
     const handleNotification = (e) => {
       const notification = e.detail;
       if (notification && (notification.type === 'USER_VERIFIED' || notification.type === 'NGO_VERIFIED')) {
-        if (refreshUser) {
-          refreshUser();
-        }
+        if (refreshUser) refreshUser();
       }
     };
     window.addEventListener('notification-received', handleNotification);
-    return () => {
-      window.removeEventListener('notification-received', handleNotification);
-    };
+    return () => window.removeEventListener('notification-received', handleNotification);
   }, [refreshUser]);
 
+  // Socket connect / fetch notifications
   useEffect(() => {
     if (user && user._id) {
       connectSocket(user._id);
@@ -65,30 +75,23 @@ function AppRoutes() {
         .unwrap()
         .then((notifications) => {
           const unread = (notifications || []).filter(n => !n.isRead);
-          if (unread.length > 0) {
-            unread.forEach(n => {
-              showToast(`🔔 ${n.title}: ${n.message}`, 'info');
-            });
-          }
+          if (unread.length > 0) unread.forEach(n => showToast(`🔔 ${n.title}: ${n.message}`, 'info'));
         })
         .catch((err) => {
-          console.error("Failed to load notifications on login:", err);
+          console.error('Failed to load notifications on login:', err);
         });
       requestFcmPermission();
     } else {
       disconnectSocket();
       dispatch(clearNotifications());
     }
-    return () => {
-      disconnectSocket();
-    };
+    return () => disconnectSocket();
   }, [user, dispatch]);
 
   // Periodic checks: pending items + critical NGO request alerts
   useEffect(() => {
     if (!user) return;
 
-    // Track last shown critical alerts to avoid spamming same request
     const shownCriticalIds = new Set();
 
     const runPendingCheck = async () => {
@@ -113,40 +116,27 @@ function AppRoutes() {
             const ngo = resNgo.data?.ngo;
             if (ngo) {
               isNgoApproved = ngo.isApproved;
-              if (!ngo.isApproved) {
-                showToast('ℹ️ NGO Status: Your NGO registration is currently pending admin approval.', 'info');
-              }
+              if (!ngo.isApproved) showToast('ℹ️ NGO Status: Your NGO registration is currently pending admin approval.', 'info');
             }
           } catch { /* ignore */ }
 
           if (isNgoApproved) {
             const resAssigned = await api.get('/aahar/foodInfo/my-assigned-donations');
             const assigned = resAssigned.data?.donations || [];
-            const pendingAccept = assigned.filter(d => {
-              const s = (d.status || '').replace(/_/g, '').toUpperCase();
-              return s === 'PENDINGNGOACCEPTANCE';
-            });
+            const pendingAccept = assigned.filter(d => ((d.status || '').replace(/_/g, '').toUpperCase()) === 'PENDINGNGOACCEPTANCE');
             const readyPickup = assigned.filter(d => {
               const s = (d.status || '').replace(/_/g, '').toUpperCase();
               return s === 'NGOACCEPTED' || s === 'APPROVED' || s === 'REQUESTACCEPTED';
             });
-            if (pendingAccept.length > 0) {
-              showToast(`🎁 ${pendingAccept.length} direct donation${pendingAccept.length > 1 ? 's' : ''} awaiting your acceptance in NGO Portal → Direct Donations.`, 'warning');
-            }
-            if (readyPickup.length > 0) {
-              showToast(`🚚 ${readyPickup.length} donation${readyPickup.length > 1 ? 's are' : ' is'} accepted and ready for pickup. Verify on NGO Portal.`, 'info');
-            }
+            if (pendingAccept.length > 0) showToast(`🎁 ${pendingAccept.length} direct donation${pendingAccept.length > 1 ? 's' : ''} awaiting your acceptance in NGO Portal → Direct Donations.`, 'warning');
+            if (readyPickup.length > 0) showToast(`🚚 ${readyPickup.length} donation${readyPickup.length > 1 ? 's are' : ' is'} accepted and ready for pickup. Verify on NGO Portal.`, 'info');
           } else {
-            if (!user.isVerified && user.adharVerificationDocument) {
-              showToast('ℹ️ Verification Update: Your Aadhaar document review is in progress by Admin.', 'info');
-            }
+            if (!user.isVerified && user.adharVerificationDocument) showToast('ℹ️ Verification Update: Your Aadhaar document review is in progress by Admin.', 'info');
             const resActive = await api.get('/aahar/ngo-food-requests/active');
             const activeList = resActive.data?.requests || [];
             const donorId = user._id || user.id;
             const filteredActive = activeList.filter(r => r.requestedBy !== donorId && r.requestedBy?._id !== donorId);
-            if (filteredActive.length > 0) {
-              showToast(`🌾 ${filteredActive.length} active NGO food need${filteredActive.length > 1 ? 's' : ''} in your area. Help fulfill a request!`, 'info');
-            }
+            if (filteredActive.length > 0) showToast(`🌾 ${filteredActive.length} active NGO food need${filteredActive.length > 1 ? 's' : ''} in your area. Help fulfill a request!`, 'info');
           }
         }
       } catch (err) {
@@ -154,7 +144,6 @@ function AppRoutes() {
       }
     };
 
-    // Critical NGO alert: runs every 1 minute, only for critical urgency requests
     const runCriticalCheck = async () => {
       try {
         const res = await api.get('/aahar/ngo-food-requests/active');
@@ -165,14 +154,9 @@ function AppRoutes() {
             shownCriticalIds.add(r._id);
             const ngoName = r.ngoId?.ngoName || 'An NGO';
             const items = (r.foodItemsNeeded || []).map(i => `${i.foodName} (${i.quantity}${i.quantityType})`).join(', ');
-            showToast(
-              `🚨 CRITICAL: ${ngoName} urgently needs food — ${items}. Help now!`,
-              r.urgencyLevel === 'critical' ? 'error' : 'warning',
-              8000
-            );
+            showToast(`🚨 CRITICAL: ${ngoName} urgently needs food — ${items}. Help now!`, r.urgencyLevel === 'critical' ? 'error' : 'warning', 8000);
           }
         });
-        // Clear IDs that are no longer active so they can re-alert next cycle
         const activeIds = new Set(critical.map(r => r._id));
         shownCriticalIds.forEach(id => { if (!activeIds.has(id)) shownCriticalIds.delete(id); });
       } catch { /* ignore */ }
@@ -183,10 +167,7 @@ function AppRoutes() {
 
     const pendingInterval = setInterval(runPendingCheck, 300000); // 5 minutes
     const criticalInterval = setInterval(runCriticalCheck, 60000);  // 1 minute
-    return () => {
-      clearInterval(pendingInterval);
-      clearInterval(criticalInterval);
-    };
+    return () => { clearInterval(pendingInterval); clearInterval(criticalInterval); };
   }, [user]);
 
   return (
