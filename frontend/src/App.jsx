@@ -6,6 +6,7 @@ import { AuthProvider, AuthContext } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import Toast, { showToast } from './components/Toast';
 import Chatbot from './components/Chatbot';
+import SupportWidget from './components/SupportWidget';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 
@@ -30,8 +31,32 @@ import './index.css';
 import './App.css';
 
 function AppRoutes() {
-  const { user } = useContext(AuthContext);
+  const { user, refreshUser } = useContext(AuthContext);
   const dispatch = useDispatch();
+
+  // Refresh user profile once on app mount if user exists
+  useEffect(() => {
+    if (user && user._id && refreshUser) {
+      refreshUser();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshUser]);
+
+  // Listen for socket notification events to trigger real-time verification updates
+  useEffect(() => {
+    const handleNotification = (e) => {
+      const notification = e.detail;
+      if (notification && (notification.type === 'USER_VERIFIED' || notification.type === 'NGO_VERIFIED')) {
+        if (refreshUser) {
+          refreshUser();
+        }
+      }
+    };
+    window.addEventListener('notification-received', handleNotification);
+    return () => {
+      window.removeEventListener('notification-received', handleNotification);
+    };
+  }, [refreshUser]);
 
   useEffect(() => {
     if (user && user._id) {
@@ -221,6 +246,7 @@ function AppRoutes() {
       </Routes>
       <Toast />
       <Chatbot />
+      <SupportWidget />
     </>
   );
 }

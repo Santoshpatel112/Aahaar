@@ -17,6 +17,7 @@ import userStatsRoutes from "./routes/userStatsRoutes.js";
 import statsRoutes from "./routes/statsRoutes.js";
 import ngoFoodRequestRoutes from "./routes/ngoFoodRequestRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import supportRoutes from "./routes/supportRoutes.js";
 
 const port = process.env.PORT || 5000;
 
@@ -56,6 +57,7 @@ app.use('/aahar/user-stats', userStatsRoutes);
 app.use('/aahar/stats', statsRoutes);
 app.use('/aahar/ngo-food-requests', ngoFoodRequestRoutes);
 app.use('/aahar/notifications', notificationRoutes);
+app.use('/aahar/support', supportRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: "Welcome to Aahaar API. The server is running successfully." });

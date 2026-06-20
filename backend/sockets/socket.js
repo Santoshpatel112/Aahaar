@@ -21,6 +21,21 @@ export const initializeSocket = (server) => {
       }
     });
 
+    // Support ticket rooms for real-time chat
+    socket.on('join_ticket_room', (ticketId) => {
+      if (ticketId) {
+        socket.join(ticketId.toString());
+        console.log(`Socket ${socket.id} joined ticket room: ${ticketId}`);
+      }
+    });
+
+    socket.on('leave_ticket_room', (ticketId) => {
+      if (ticketId) {
+        socket.leave(ticketId.toString());
+        console.log(`Socket ${socket.id} left ticket room: ${ticketId}`);
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`);
     });

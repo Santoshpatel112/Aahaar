@@ -119,7 +119,7 @@ export default function CreateDonation() {
     if (!contact.city.trim()) errs.city = 'Required';
     if (!contact.contactPersonName.trim()) errs.contactPersonName = 'Required';
     if (!contact.phoneNumber.trim()) errs.phoneNumber = 'Required';
-    else if (!/^\d{10}$/.test(contact.phoneNumber.replace(/\s/g, ''))) errs.phoneNumber = 'Enter a valid 10-digit number';
+    else if (!/^\+?[0-9]{10,15}$/.test(contact.phoneNumber.replace(/[\s-()]/g, ''))) errs.phoneNumber = 'Enter a valid phone number (e.g. +919876543210)';
     if (!contact.email.trim()) errs.email = 'Required';
     else if (!/\S+@\S+\.\S+/.test(contact.email)) errs.email = 'Invalid email';
     return errs;

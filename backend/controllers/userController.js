@@ -185,6 +185,30 @@ const uploadAdharDocument = asyncHandler(async (req, res) => {
   }
 });
 
+const getUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (user) {
+    res.status(200).json({
+      _id: user._id,
+      firstName: user.firstName,
+      surname: user.surname,
+      email: user.email,
+      age: user.age,
+      city: user.city,
+      state: user.state,
+      country: user.country,
+      phone: user.phone,
+      isVerified: user.isVerified,
+      isAdmin: user.isAdmin,
+      adharVerificationDocument: user.adharVerificationDocument,
+      profileImage: user.profileImage,
+    });
+  } else {
+    res.status(404);
+    throw new Error("User not found");
+  }
+});
+
 //update user profile (name, address, phone, age — NOT email or documents)
 const updateUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
@@ -228,4 +252,5 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   });
 });
 
-export { authUser, registerUser, logoutUser, uploadAdharDocument, updateUserProfile };
+export { authUser, registerUser, logoutUser, uploadAdharDocument, updateUserProfile, getUserProfile };
+

@@ -8,6 +8,7 @@ import fs from 'fs';
 
 let uploadNgoDocuments;
 let uploadFoodImages;
+let uploadSupportImages;
 
 const isAWSConfigured = process.env.AWS_ACCESS_KEY_ID && 
                         process.env.AWS_ACCESS_KEY_ID !== 'mock_key' && 
@@ -44,6 +45,16 @@ if (isAWSConfigured) {
             }
         })
     });
+    uploadSupportImages = multer({
+        storage: multerS3({
+            s3: s3,
+            bucket: process.env.AWS_BUCKET_NAME,
+            acl: 'public-read',
+            key: (req, file, cb) => {
+                cb(null, `support/${Date.now()}-${file.originalname}`);
+            }
+        })
+    });
     console.log('AWS S3 storage configured successfully.');
   } catch (error) {
     console.error('Error configuring AWS S3, falling back to local storage:', error.message);
@@ -71,6 +82,7 @@ function configureLocalStorage() {
 
   uploadNgoDocuments = multer({ storage: localStorage });
   uploadFoodImages = multer({ storage: localStorage });
+  uploadSupportImages = multer({ storage: localStorage });
 }
 
 const getFileUrl = (file) => {
@@ -78,4 +90,4 @@ const getFileUrl = (file) => {
   return file.location || `http://localhost:${process.env.PORT || 5001}/uploads/${file.filename}`;
 };
 
-export { uploadNgoDocuments, uploadFoodImages, getFileUrl };
+export { uploadNgoDocuments, uploadFoodImages, uploadSupportImages, getFileUrl };

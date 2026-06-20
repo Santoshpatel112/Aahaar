@@ -129,7 +129,7 @@ const ALL_INTENTS = [
       const data = res.data?.data || res.data;
       const donations = data?.recentDonations || data?.donations || [];
       const total = donations.length;
-      const approved = donations.filter(d => d.status === 'approved' || d.status === 'done').length;
+      const approved = donations.filter(d => ['approved', 'done', 'completed', 'fulfilled', 'request_accepted', 'pickup_in_progress', 'verified'].includes((d.status || '').toLowerCase().replace(/_/g, ''))).length;
       const rate = total > 0 ? Math.round((approved / total) * 100) : 0;
       return `📈 **Your Donation Success Rate:**\n\n• **Total Donations:** ${total}\n• **Accepted / Completed:** ${approved}\n• **Success Rate:** **${rate}%**\n\n${rate >= 80 ? "Excellent work! You are a superstar donor! 🌟" : "Your contributions are helping feed the hungry. Thank you! ❤️"}`;
     }
@@ -145,9 +145,9 @@ const ALL_INTENTS = [
       const data = res.data?.data || res.data;
       const donations = data?.recentDonations || data?.donations || [];
       const total = donations.length;
-      const pending = donations.filter(d => d.status === 'pending').length;
-      const approved = donations.filter(d => d.status === 'approved').length;
-      const done = donations.filter(d => d.status === 'done').length;
+      const pending = donations.filter(d => ['pending', 'created'].includes((d.status || '').toLowerCase().replace(/_/g, ''))).length;
+      const approved = donations.filter(d => ['approved', 'request_accepted', 'pickup_in_progress', 'verified'].includes((d.status || '').toLowerCase().replace(/_/g, ''))).length;
+      const done = donations.filter(d => ['done', 'completed', 'fulfilled'].includes((d.status || '').toLowerCase().replace(/_/g, ''))).length;
       return `📦 **Your Donation Statistics:**\n\n• **Total Created:** ${total} request(s)\n• **Completed/Served:** ${done} ✅\n• **Approved (Accepted by NGO):** ${approved} 🚚\n• **Pending Review:** ${pending} ⏳\n\nThank you for your generous support! You are making a huge difference in ${user.city || 'your city'}.`;
     }
   },
@@ -176,10 +176,10 @@ const ALL_INTENTS = [
       const res = await api.get('/aahar/ngo-food-requests/my-requests');
       const reqs = res.data?.requests || [];
       const total = reqs.length;
-      const pending = reqs.filter(r => r.status === 'pending').length;
-      const approved = reqs.filter(r => r.status === 'approved').length;
-      const fulfilled = reqs.filter(r => r.status === 'fulfilled').length;
-      const rejected = reqs.filter(r => r.status === 'rejected').length;
+      const pending = reqs.filter(r => ['pending', 'created'].includes((r.status || '').toLowerCase().replace(/_/g, ''))).length;
+      const approved = reqs.filter(r => ['approved', 'request_accepted', 'pickup_in_progress', 'verified'].includes((r.status || '').toLowerCase().replace(/_/g, ''))).length;
+      const fulfilled = reqs.filter(r => ['fulfilled', 'completed', 'done'].includes((r.status || '').toLowerCase().replace(/_/g, ''))).length;
+      const rejected = reqs.filter(r => ['rejected'].includes((r.status || '').toLowerCase().replace(/_/g, ''))).length;
       return `📋 **Your NGO Request Summary:**\n\n• **Total Requests Made:** ${total}\n• **Pending Review:** ${pending} ⏳\n• **Approved (Awaiting pickup):** ${approved} ✅\n• **Completed (Delivered):** ${fulfilled} 🚚\n• **Rejected:** ${rejected} ❌\n\nKeep coordinating food drives to help the community! 🌾`;
     }
   },
