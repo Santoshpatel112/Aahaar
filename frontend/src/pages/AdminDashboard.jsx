@@ -752,8 +752,12 @@ export default function AdminDashboard() {
   // Support ticket state variables
   const [supportTickets, setSupportTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [ticketMinimized, setTicketMinimized] = useState(false);
   const [supportSearch, setSupportSearch] = useState('');
   const [supportReply, setSupportReply] = useState('');
+  const [tokenSearch, setTokenSearch] = useState('');
+  const [tokenResult, setTokenResult] = useState(null);
+  const [tokenModalOpen, setTokenModalOpen] = useState(false);
 
   useEffect(() => {
     if (location.state?.tab) {
@@ -918,6 +922,19 @@ export default function AdminDashboard() {
   const approveNgoRequest = async (id) => { try { await api.put(`/aahar/admin/ngo-food-requests/${id}/approve`); showToast('NGO request approved ✅', 'success'); fetchNgoRequests(); } catch { showToast('Failed', 'error'); } };
   const rejectNgoRequest = async (id, reason) => { try { await api.put(`/aahar/admin/ngo-food-requests/${id}/reject`, { rejectionReason: reason }); showToast('NGO request rejected', 'success'); setNgoRejectModal(null); fetchNgoRequests(); } catch { showToast('Failed', 'error'); } };
   const fulfillNgoRequest = async (id) => { try { await api.put(`/aahar/admin/ngo-food-requests/${id}/fulfill`); showToast('NGO request marked as Fulfilled 🚚', 'success'); fetchNgoRequests(); } catch { showToast('Failed to fulfill', 'error'); } };
+
+  // Token search
+  const handleTokenSearch = async () => {
+    const token = (tokenSearch || '').trim();
+    if (!token) { showToast('Please enter a token or ID to search', 'info'); return; }
+    try {
+      const res = await api.get(`/aahar/admin/search-by-token/${encodeURIComponent(token)}`);
+      setTokenResult(res.data || null);
+      setTokenModalOpen(true);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'No results found', 'error');
+    }
+  };
 
   const handleLogout = async () => { await logout(); showToast('Logged out', 'success'); navigate('/'); };
 
@@ -1133,6 +1150,20 @@ export default function AdminDashboard() {
           {tab === 'overview' && <button className="btn-ghost" onClick={fetchStats} style={{ fontSize: '0.85rem' }}>🔄 Refresh</button>}
           {tab === 'ngos' && <button className="btn-ghost" onClick={fetchNgos} style={{ fontSize: '0.85rem' }}>🔄 Refresh</button>}
           {tab === 'ngo-requests' && <button className="btn-ghost" onClick={fetchNgoRequests} style={{ fontSize: '0.85rem' }}>🔄 Refresh</button>}
+
+          {/* Quick Token Search */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 12 }}>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Search by Token/ID"
+              value={tokenSearch}
+              onChange={e => setTokenSearch(e.target.value)}
+              style={{ width: 220, padding: '6px 10px', fontSize: '0.82rem' }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleTokenSearch(); }}
+            />
+            <button className="btn-primary" onClick={() => handleTokenSearch()} style={{ padding: '6px 10px' }}>Search</button>
+          </div>
         </div>
 
         {/* ─── OVERVIEW ─── */}
@@ -2066,24 +2097,30 @@ export default function AdminDashboard() {
                         Submitted by: <strong>{selectedTicket.user?.firstName} {selectedTicket.user?.surname}</strong> ({selectedTicket.user?.email || '—'}) · Role: <strong>{selectedTicket.userRole.toUpperCase()}</strong>
                       </div>
                     </div>
-                    {selectedTicket.status === 'open' && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            const res = await api.put(`/aahar/support/${selectedTicket._id}/resolve`);
-                            showToast('Ticket marked as resolved & closed!', 'success');
-                            setSelectedTicket(res.data);
-                            fetchSupportTickets();
-                          } catch {
-                            showToast('Failed to resolve ticket', 'error');
-                          }
-                        }}
-                        className="btn-primary"
-                        style={{ background: 'var(--grad-green)', border: 'none', padding: '8px 16px', borderRadius: 6, fontWeight: 700, fontSize: '0.8rem' }}
-                      >
-                        ✔ Mark as Done & Close
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      {selectedTicket.status === 'open' && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await api.put(`/aahar/support/${selectedTicket._id}/resolve`);
+                              showToast('Ticket marked as resolved & closed!', 'success');
+                              setSelectedTicket(res.data);
+                              fetchSupportTickets();
+                            } catch {
+                              showToast('Failed to resolve ticket', 'error');
+                            }
+                          }}
+                          className="btn-primary"
+                          style={{ background: 'var(--grad-green)', border: 'none', padding: '8px 16px', borderRadius: 6, fontWeight: 700, fontSize: '0.8rem' }}
+                        >
+                          ✔ Mark as Done & Close
+                        </button>
+                      )}
+
+                      <button className="btn-ghost" onClick={() => setTicketMinimized(prev => !prev)} style={{ padding: '6px 10px', fontSize: '0.82rem' }}>
+                        {ticketMinimized ? '🔼 Restore' : '➖ Minimize'}
                       </button>
-                    )}
+                    </div>
                   </div>
 
                   {/* Body description & Image attachment */}
@@ -2114,45 +2151,54 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Messages History */}
-                  <div style={{ flex: 1, padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.1)' }}>
-                    {selectedTicket.messages && selectedTicket.messages.length === 0 ? (
-                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', margin: 'auto 0', fontSize: '0.85rem' }}>
-                        No messages exchanged yet. Reply below to start the communication.
+                  {!ticketMinimized ? (
+                    <div style={{ flex: 1, padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.1)' }}>
+                      {selectedTicket.messages && selectedTicket.messages.length === 0 ? (
+                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', margin: 'auto 0', fontSize: '0.85rem' }}>
+                          No messages exchanged yet. Reply below to start the communication.
+                        </div>
+                      ) : (
+                        selectedTicket.messages?.map((m, idx) => {
+                          const isAdminMsg = m.senderRole === 'admin';
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                alignSelf: isAdminMsg ? 'flex-end' : 'flex-start',
+                                maxWidth: '80%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: isAdminMsg ? 'flex-end' : 'flex-start'
+                              }}
+                            >
+                              <div style={{
+                                padding: '8px 12px',
+                                borderRadius: isAdminMsg ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                                background: isAdminMsg ? 'linear-gradient(135deg, #10b981, #059669)' : 'var(--bg-card-alt)',
+                                color: isAdminMsg ? '#fff' : 'var(--text-primary)',
+                                fontSize: '0.85rem',
+                                border: isAdminMsg ? 'none' : '1px solid var(--border-color)',
+                                whiteSpace: 'pre-wrap',
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.1)'
+                              }}>
+                                {m.message}
+                              </div>
+                              <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                                {isAdminMsg ? 'You (Admin)' : 'User'} · {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ padding: 12, borderBottom: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.04)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)' }}>Chat minimized</div>
+                        <button className="btn-ghost" onClick={() => setTicketMinimized(false)}>🔼 Restore</button>
                       </div>
-                    ) : (
-                      selectedTicket.messages?.map((m, idx) => {
-                        const isAdminMsg = m.senderRole === 'admin';
-                        return (
-                          <div
-                            key={idx}
-                            style={{
-                              alignSelf: isAdminMsg ? 'flex-end' : 'flex-start',
-                              maxWidth: '80%',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: isAdminMsg ? 'flex-end' : 'flex-start'
-                            }}
-                          >
-                            <div style={{
-                              padding: '8px 12px',
-                              borderRadius: isAdminMsg ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                              background: isAdminMsg ? 'linear-gradient(135deg, #10b981, #059669)' : 'var(--bg-card-alt)',
-                              color: isAdminMsg ? '#fff' : 'var(--text-primary)',
-                              fontSize: '0.85rem',
-                              border: isAdminMsg ? 'none' : '1px solid var(--border-color)',
-                              whiteSpace: 'pre-wrap',
-                              boxShadow: '0 1px 4px rgba(0,0,0,0.1)'
-                            }}>
-                              {m.message}
-                            </div>
-                            <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                              {isAdminMsg ? 'You (Admin)' : 'User'} · {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Message Input / Resolved banner */}
                   {selectedTicket.status === 'resolved' ? (
@@ -2263,6 +2309,42 @@ export default function AdminDashboard() {
           onConfirm={(code) => markAsDone(verificationModal, code)}
           onCancel={() => setVerificationModal(null)}
         />
+      )}
+
+      {/* Token Result Modal */}
+      {tokenModalOpen && tokenResult && (
+        <div className="modal-overlay" onClick={() => setTokenModalOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 720 }}>
+            <h3 className="modal__title">Search Result for Token</h3>
+            <div style={{ display: 'flex', gap: 12, flexDirection: 'column' }}>
+              {tokenResult.donation ? (
+                <div>
+                  <h4>Donation</h4>
+                  <div>Donation ID: <strong>{tokenResult.donation._id}</strong></div>
+                  <div>Donor: <strong>{tokenResult.donation.foodItemDetails?.[0]?.donorId ? `${tokenResult.donation.foodItemDetails[0].donorId.firstName} ${tokenResult.donation.foodItemDetails[0].donorId.surname}` : '—'}</strong></div>
+                  <div>Phone: <strong>{tokenResult.donation.foodItemDetails?.[0]?.donorId?.phone || tokenResult.donation.contactDetails?.phoneNumber || '—'}</strong></div>
+                  <div>Items: {(tokenResult.donation.foodItemDetails || []).map(i => `${i.foodName} (${i.quantity}${i.quantityType})`).join(', ')}</div>
+                  {tokenResult.donation.foodItemDetails?.[0]?.imageUrl?.length > 0 && (
+                    <img src={tokenResult.donation.foodItemDetails[0].imageUrl[0]} alt="item" style={{ maxWidth: 160, borderRadius: 8 }} />
+                  )}
+                </div>
+              ) : null}
+
+              {tokenResult.request ? (
+                <div>
+                  <h4>NGO Request</h4>
+                  <div>Request ID: <strong>{tokenResult.request._id}</strong></div>
+                  <div>NGO: <strong>{tokenResult.request.ngoId?.ngoName}</strong></div>
+                  <div>Contact: <strong>{tokenResult.request.contactDetails?.phoneNumber || tokenResult.request.ngoId?.ngoPhone || '—'}</strong></div>
+                  <div>Items: {(tokenResult.request.foodItemsNeeded || []).map(i => `${i.foodName} (${i.quantity}${i.quantityType})`).join(', ')}</div>
+                </div>
+              ) : null}
+            </div>
+            <div className="modal__actions" style={{ marginTop: 16 }}>
+              <button className="btn-ghost" onClick={() => setTokenModalOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

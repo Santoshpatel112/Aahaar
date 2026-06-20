@@ -7,6 +7,8 @@ let toastQueue = [];
 let listeners = [];
 
 export function showToast(message, type = 'info', duration = 4000) {
+  // Avoid showing the same toast repeatedly (dedupe by message+type)
+  if (toastQueue.some(t => t.message === message && t.type === type)) return;
   const id = Date.now() + Math.random();
   const toast = { id, message, type, duration };
   toastQueue = [...toastQueue, toast];
