@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import { showToast } from '../components/Toast';
 import StatusBadge from '../components/StatusBadge';
+import { getSocket } from '../services/socket';
 
 const TABS = [
   { id: 'overview', icon: '📊', label: 'Overview' },
@@ -13,7 +14,26 @@ const TABS = [
   { id: 'users', icon: '👥', label: 'Users' },
   { id: 'ngos', icon: '🏢', label: 'NGOs' },
   { id: 'ngo-requests', icon: '📋', label: 'NGO Requests' },
+  { id: 'support-tickets', icon: '🎧', label: 'Support Tickets' },
 ];
+
+const isRequestStatusMatch = (status, filter) => {
+  if (filter === 'all') return true;
+  const s = (status || '').toLowerCase().replace(/_/g, '');
+  if (filter === 'pending') {
+    return s === 'pending' || s === 'created';
+  }
+  if (filter === 'approved') {
+    return s === 'approved' || s === 'requestaccepted' || s === 'pickupinprogress' || s === 'verified';
+  }
+  if (filter === 'rejected') {
+    return s === 'rejected';
+  }
+  if (filter === 'fulfilled' || filter === 'completed') {
+    return s === 'fulfilled' || s === 'completed' || s === 'done';
+  }
+  return s === filter;
+};
 
 function SkeletonRow({ cols = 5 }) {
   return (
@@ -729,6 +749,12 @@ export default function AdminDashboard() {
   const [userSearch, setUserSearch] = useState('');
   const [trendPeriod, setTrendPeriod] = useState('weekly');
 
+  // Support ticket state variables
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [supportSearch, setSupportSearch] = useState('');
+  const [supportReply, setSupportReply] = useState('');
+
   useEffect(() => {
     if (location.state?.tab) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -780,6 +806,18 @@ export default function AdminDashboard() {
     finally { setLoading(false); }
   }, []);
 
+  const fetchSupportTickets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/aahar/support/admin/tickets');
+      setSupportTickets(res.data || []);
+    } catch {
+      showToast('Failed to load support tickets', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const fetchNgoRequests = useCallback(async () => {
     setLoading(true);
     try {
@@ -801,12 +839,13 @@ export default function AdminDashboard() {
       fetchDonations();
       fetchNgos();
       fetchNgoRequests();
+      fetchSupportTickets();
     };
     loadData();
     return () => {
       active = false;
     };
-  }, [fetchStats, fetchUsers, fetchDonations, fetchNgos, fetchNgoRequests]);
+  }, [fetchStats, fetchUsers, fetchDonations, fetchNgos, fetchNgoRequests, fetchSupportTickets]);
 
   // Listen for socket notification events to trigger real-time admin dashboard data refresh
   useEffect(() => {
@@ -847,7 +886,8 @@ export default function AdminDashboard() {
     if (newTab === 'ngo-requests') fetchNgoRequests();
     if (newTab === 'donations') fetchDonations();
     if (newTab === 'users') fetchUsers();
-  }, [fetchNgos, fetchNgoRequests, fetchDonations, fetchUsers]);
+    if (newTab === 'support-tickets') fetchSupportTickets();
+  }, [fetchNgos, fetchNgoRequests, fetchDonations, fetchUsers, fetchSupportTickets]);
 
   // User actions
   const makeAdmin = async (id) => { try { await api.put(`/aahar/admin/users/${id}/make-admin`); showToast('User promoted to Admin', 'success'); fetchUsers(); } catch { showToast('Failed', 'error'); } };
@@ -881,6 +921,57 @@ export default function AdminDashboard() {
 
   const handleLogout = async () => { await logout(); showToast('Logged out', 'success'); navigate('/'); };
 
+  // Socket room joining for selected support ticket
+  useEffect(() => {
+    if (!selectedTicket || tab !== 'support-tickets') return;
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    socket.emit('join_ticket_room', selectedTicket._id);
+
+    const handleNewMessage = (data) => {
+      if (data.ticketId === selectedTicket._id) {
+        setSelectedTicket(prev => {
+          if (!prev) return null;
+          // Avoid duplicate messages
+          if (prev.messages?.some(m => m._id === data.message._id)) return prev;
+          return {
+            ...prev,
+            messages: [...(prev.messages || []), data.message]
+          };
+        });
+      }
+    };
+
+    const handleTicketResolved = (updatedTicket) => {
+      if (updatedTicket._id === selectedTicket._id) {
+        setSelectedTicket(prev => prev ? { ...prev, status: 'resolved' } : null);
+      }
+    };
+
+    socket.on('ticket_message_received', handleNewMessage);
+    socket.on('ticket_resolved', handleTicketResolved);
+
+    return () => {
+      socket.emit('leave_ticket_room', selectedTicket._id);
+      socket.off('ticket_message_received', handleNewMessage);
+      socket.off('ticket_resolved', handleTicketResolved);
+    };
+  }, [selectedTicket, tab]);
+
+  const filteredSupportTickets = supportTickets.filter(t => {
+    if (!supportSearch) return true;
+    const query = supportSearch.toLowerCase();
+    const matchesTicketId = t.ticketId?.toLowerCase().includes(query);
+    const matchesRelatedId = t.relatedId?.toLowerCase().includes(query);
+    const matchesUser = t.user && (
+      `${t.user.firstName} ${t.user.surname} ${t.user.email}`.toLowerCase().includes(query)
+    );
+    const matchesContent = t.description?.toLowerCase().includes(query) || t.issueType?.toLowerCase().includes(query);
+    return matchesTicketId || matchesRelatedId || matchesUser || matchesContent;
+  });
+
   const filteredDonations = donationFilter === 'all' ? donations : donations.filter(d => {
     if (donationFilter === 'pending') {
       return d.status === 'pending' || d.status === 'PENDING_NGO_ACCEPTANCE';
@@ -902,7 +993,7 @@ export default function AdminDashboard() {
     return false;
   });
   const filteredUsers = userSearch ? users.filter(u => `${u.firstName} ${u.surname} ${u.email}`.toLowerCase().includes(userSearch.toLowerCase())) : users;
-  const filteredNgoRequests = ngoRequestFilter === 'all' ? ngoRequests : ngoRequests.filter(r => r.status === ngoRequestFilter);
+  const filteredNgoRequests = ngoRequests.filter(r => isRequestStatusMatch(r.status, ngoRequestFilter));
 
   const URGENCY_MAP = {
     low: { bg: 'rgba(6,182,212,0.12)', color: 'var(--color-teal)', label: 'Low' },
@@ -913,9 +1004,15 @@ export default function AdminDashboard() {
 
   const NGO_REQ_STATUS_MAP = {
     pending: { bg: 'rgba(234,179,8,0.15)', color: '#fbbf24', icon: '⏳', label: 'Pending' },
+    created: { bg: 'rgba(234,179,8,0.15)', color: '#fbbf24', icon: '⏳', label: 'Pending' },
     approved: { bg: 'rgba(34,197,94,0.15)', color: '#4ade80', icon: '✅', label: 'Approved' },
+    requestaccepted: { bg: 'rgba(6,182,212,0.15)', color: '#06b6d4', icon: '🤝', label: 'Fulfillment Scheduled' },
+    pickupinprogress: { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', icon: '🚚', label: 'Pickup In Progress' },
+    verified: { bg: 'rgba(34,197,94,0.15)', color: '#22c55e', icon: '✓', label: 'Verified' },
     rejected: { bg: 'rgba(239,68,68,0.15)', color: '#f87171', icon: '❌', label: 'Rejected' },
-    fulfilled: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa', icon: '🚚', label: 'Fulfilled' },
+    fulfilled: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa', icon: '🚚', label: 'Completed' },
+    completed: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa', icon: '🚚', label: 'Completed' },
+    done: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa', icon: '🚚', label: 'Completed' },
   };
 
   const overviewStats = [
@@ -960,9 +1057,9 @@ export default function AdminDashboard() {
                   {ngos.filter(n => !n.isApproved).length} pending
                 </span>
               )}
-              {t.id === 'ngo-requests' && ngoRequests.filter(r => r.status === 'pending').length > 0 && tab !== 'ngo-requests' && (
+              {t.id === 'ngo-requests' && ngoRequests.filter(r => isRequestStatusMatch(r.status, 'pending')).length > 0 && tab !== 'ngo-requests' && (
                 <span style={{ marginLeft: 'auto', background: 'rgba(249,115,22,0.15)', color: 'var(--color-orange)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
-                  {ngoRequests.filter(r => r.status === 'pending').length}
+                  {ngoRequests.filter(r => isRequestStatusMatch(r.status, 'pending')).length}
                 </span>
               )}
             </button>
@@ -1029,6 +1126,7 @@ export default function AdminDashboard() {
                 users: 'Manage user accounts, roles, and verification status',
                 ngos: 'Review and approve NGO registrations in your city',
                 'ngo-requests': 'Review and fulfill food requests from approved NGOs',
+                'support-tickets': 'Respond to support tickets and chat with users in real-time',
               }[tab]}
             </p>
           </div>
@@ -1695,7 +1793,7 @@ export default function AdminDashboard() {
                   {f === 'all' ? 'All' : f === 'fulfilled' ? 'Fulfilled' : f.charAt(0).toUpperCase() + f.slice(1)}
                   {f !== 'all' && ngoRequests.length > 0 && (
                     <span style={{ marginLeft: 6, background: 'rgba(255,255,255,0.08)', padding: '0 6px', borderRadius: 99, fontSize: '0.7rem' }}>
-                      {ngoRequests.filter(r => r.status === f).length}
+                      {ngoRequests.filter(r => isRequestStatusMatch(r.status, f)).length}
                     </span>
                   )}
                 </button>
@@ -1721,7 +1819,7 @@ export default function AdminDashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {filteredNgoRequests.map((req, idx) => {
                   const urgency = URGENCY_MAP[req.urgencyLevel] || URGENCY_MAP.medium;
-                  const statusInfo = NGO_REQ_STATUS_MAP[req.status] || NGO_REQ_STATUS_MAP.pending;
+                  const statusInfo = NGO_REQ_STATUS_MAP[(req.status || '').toLowerCase().replace(/_/g, '')] || NGO_REQ_STATUS_MAP.pending;
                   return (
                     <div key={req._id} style={{ background: 'var(--glass-bg)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '20px 24px', animation: 'fadeInUp 0.3s ease both', animationDelay: `${idx * 0.05}s` }}>
                       {/* Header */}
@@ -1859,6 +1957,258 @@ export default function AdminDashboard() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ─── SUPPORT TICKETS ─── */}
+        {tab === 'support-tickets' && (
+          <div style={{ animation: 'fadeInUp 0.3s ease', display: 'grid', gridTemplateColumns: '350px 1fr', gap: 20, height: 'calc(100vh - 200px)', minHeight: 550 }}>
+            {/* Left Panel: Ticket list */}
+            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 16 }}>
+              <div style={{ marginBottom: 12 }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Search by Ticket/Related ID, User..."
+                  value={supportSearch}
+                  onChange={(e) => setSupportSearch(e.target.value)}
+                  style={{ width: '100%', marginBottom: 0, padding: '8px 12px', fontSize: '0.82rem' }}
+                />
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {filteredSupportTickets.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: '0.85rem' }}>
+                    No support tickets found
+                  </div>
+                ) : (
+                  filteredSupportTickets.map(t => {
+                    const urgency = URGENCY_MAP[t.urgency] || URGENCY_MAP.medium;
+                    const isSelected = selectedTicket?._id === t._id;
+                    return (
+                      <div
+                        key={t._id}
+                        onClick={() => setSelectedTicket(t)}
+                        style={{
+                          padding: 12,
+                          background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.02)',
+                          borderRadius: 8,
+                          border: isSelected ? '1px solid #3b82f6' : '1px solid var(--border-color)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.78rem', color: '#3b82f6' }}>
+                            #{t.ticketId}
+                          </span>
+                          <span style={{
+                            fontSize: '0.65rem',
+                            padding: '1px 6px',
+                            borderRadius: 4,
+                            background: t.status === 'resolved' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)',
+                            color: t.status === 'resolved' ? '#10b981' : '#3b82f6',
+                            fontWeight: 700
+                          }}>
+                            {t.status.toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>
+                          {t.user ? `${t.user.firstName} ${t.user.surname}` : 'Unknown User'} ({t.userRole.toUpperCase()})
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                          Type: {t.issueType.replace(/_/g, ' ')}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}>
+                          <span style={{
+                            fontSize: '0.65rem',
+                            padding: '1px 6px',
+                            borderRadius: 4,
+                            background: urgency.bg,
+                            color: urgency.color,
+                            fontWeight: 700
+                          }}>
+                            {urgency.label}
+                          </span>
+                          {t.relatedId && (
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                              🔗 ID: {t.relatedId}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Right Panel: Chat and Details */}
+            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
+              {selectedTicket ? (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  {/* Active Ticket Header */}
+                  <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.01)' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0 }}>Ticket #{selectedTicket.ticketId}</h2>
+                        <span style={{
+                          fontSize: '0.7rem',
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          background: URGENCY_MAP[selectedTicket.urgency]?.bg,
+                          color: URGENCY_MAP[selectedTicket.urgency]?.color,
+                          fontWeight: 700
+                        }}>{selectedTicket.urgency.toUpperCase()}</span>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        Submitted by: <strong>{selectedTicket.user?.firstName} {selectedTicket.user?.surname}</strong> ({selectedTicket.user?.email || '—'}) · Role: <strong>{selectedTicket.userRole.toUpperCase()}</strong>
+                      </div>
+                    </div>
+                    {selectedTicket.status === 'open' && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await api.put(`/aahar/support/${selectedTicket._id}/resolve`);
+                            showToast('Ticket marked as resolved & closed!', 'success');
+                            setSelectedTicket(res.data);
+                            fetchSupportTickets();
+                          } catch {
+                            showToast('Failed to resolve ticket', 'error');
+                          }
+                        }}
+                        className="btn-primary"
+                        style={{ background: 'var(--grad-green)', border: 'none', padding: '8px 16px', borderRadius: 6, fontWeight: 700, fontSize: '0.8rem' }}
+                      >
+                        ✔ Mark as Done & Close
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Body description & Image attachment */}
+                  <div style={{ padding: '12px 20px', background: 'rgba(255,255,255,0.01)', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
+                    <div style={{ marginBottom: 6 }}><strong>Description:</strong></div>
+                    <div style={{ color: 'var(--text-secondary)', lineHeight: 1.5, background: 'rgba(0,0,0,0.15)', padding: 12, borderRadius: 8 }}>
+                      {selectedTicket.description}
+                    </div>
+                    {selectedTicket.relatedId && (
+                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>🔗 <strong>Related ID/Token:</strong></span>
+                        <code style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4, color: 'var(--color-orange)', fontWeight: 700 }}>
+                          {selectedTicket.relatedId}
+                        </code>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          (You can search this ID/token directly in Donations or NGO Requests)
+                        </span>
+                      </div>
+                    )}
+                    {selectedTicket.imageUrl && (
+                      <div style={{ marginTop: 8 }}>
+                        🖼️ <strong>Attached Screenshot:</strong>{' '}
+                        <a href={selectedTicket.imageUrl} target="_blank" rel="noreferrer" style={{ color: '#3b82f6', fontWeight: 600, textDecoration: 'none' }}>
+                          View Screenshot
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Messages History */}
+                  <div style={{ flex: 1, padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.1)' }}>
+                    {selectedTicket.messages && selectedTicket.messages.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', margin: 'auto 0', fontSize: '0.85rem' }}>
+                        No messages exchanged yet. Reply below to start the communication.
+                      </div>
+                    ) : (
+                      selectedTicket.messages?.map((m, idx) => {
+                        const isAdminMsg = m.senderRole === 'admin';
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              alignSelf: isAdminMsg ? 'flex-end' : 'flex-start',
+                              maxWidth: '80%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: isAdminMsg ? 'flex-end' : 'flex-start'
+                            }}
+                          >
+                            <div style={{
+                              padding: '8px 12px',
+                              borderRadius: isAdminMsg ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                              background: isAdminMsg ? 'linear-gradient(135deg, #10b981, #059669)' : 'var(--bg-card-alt)',
+                              color: isAdminMsg ? '#fff' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              border: isAdminMsg ? 'none' : '1px solid var(--border-color)',
+                              whiteSpace: 'pre-wrap',
+                              boxShadow: '0 1px 4px rgba(0,0,0,0.1)'
+                            }}>
+                              {m.message}
+                            </div>
+                            <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                              {isAdminMsg ? 'You (Admin)' : 'User'} · {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Message Input / Resolved banner */}
+                  {selectedTicket.status === 'resolved' ? (
+                    <div style={{ padding: 16, background: 'rgba(16,185,129,0.06)', borderTop: '1px solid rgba(16,185,129,0.2)', textAlign: 'center', fontSize: '0.85rem', color: '#10b981', fontWeight: 700 }}>
+                      🔒 This ticket has been marked as resolved and closed. Chat is locked as history.
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!supportReply.trim()) return;
+                        const msg = supportReply.trim();
+                        setSupportReply('');
+                        try {
+                          const res = await api.post(`/aahar/support/${selectedTicket._id}/message`, { message: msg });
+                          setSelectedTicket(prev => {
+                            if (!prev) return null;
+                            if (prev.messages?.some(m => m._id === res.data._id)) return prev;
+                            return {
+                              ...prev,
+                              messages: [...(prev.messages || []), res.data]
+                            };
+                          });
+                        } catch {
+                          showToast('Failed to send reply', 'error');
+                        }
+                      }}
+                      style={{ padding: '12px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', gap: 10 }}
+                    >
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Type a message to user..."
+                        value={supportReply}
+                        onChange={(e) => setSupportReply(e.target.value)}
+                        style={{ margin: 0, padding: '8px 12px', fontSize: '0.85rem', borderRadius: 6, flex: 1 }}
+                        required
+                      />
+                      <button
+                        type="submit"
+                        className="btn-primary"
+                        style={{ padding: '8px 16px', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', borderRadius: 6 }}
+                      >
+                        Reply
+                      </button>
+                    </form>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: 12 }}>🎧</div>
+                  <h3 style={{ color: 'var(--text-primary)', margin: '0 0 6px 0', fontWeight: 700 }}>Select a ticket</h3>
+                  <p style={{ fontSize: '0.85rem', maxWidth: 300, margin: 0 }}>Choose a support ticket from the list on the left to read user comments and chat in real-time.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>

@@ -78,6 +78,19 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await api.get('/aahar/users/profile');
+      const userData = res.data;
+      setUser(userData);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+      return { success: true, user: userData };
+    } catch (err) {
+      console.error('Failed to refresh user profile:', err);
+      return { success: false, error: err.response?.data?.message || 'Failed to refresh user profile.' };
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.post('/aahar/users/logout');
@@ -90,8 +103,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, login, register, uploadAadhaar, logout }}>
+    <AuthContext.Provider value={{ user, isAdmin, loading, login, register, uploadAadhaar, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
+

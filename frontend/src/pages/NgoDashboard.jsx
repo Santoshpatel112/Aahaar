@@ -19,14 +19,39 @@ const URGENCY_COLORS = {
 
 const REQUEST_STATUSES = ['pending', 'approved', 'rejected', 'fulfilled'];
 
+const isRequestStatusMatch = (status, filter) => {
+  if (filter === 'all') return true;
+  const s = (status || '').toLowerCase().replace(/_/g, '');
+  if (filter === 'pending') {
+    return s === 'pending' || s === 'created';
+  }
+  if (filter === 'approved') {
+    return s === 'approved' || s === 'requestaccepted' || s === 'pickupinprogress' || s === 'verified';
+  }
+  if (filter === 'rejected') {
+    return s === 'rejected';
+  }
+  if (filter === 'fulfilled' || filter === 'completed') {
+    return s === 'fulfilled' || s === 'completed' || s === 'done';
+  }
+  return s === filter;
+};
+
 function RequestStatusBadge({ status }) {
+  const sNorm = (status || '').toLowerCase().replace(/_/g, '');
   const map = {
     pending: { bg: 'rgba(234,179,8,0.15)', color: '#fbbf24', icon: '⏳', label: 'Pending Review' },
+    created: { bg: 'rgba(234,179,8,0.15)', color: '#fbbf24', icon: '⏳', label: 'Pending Review' },
     approved: { bg: 'rgba(34,197,94,0.15)', color: '#4ade80', icon: '✅', label: 'Approved' },
+    requestaccepted: { bg: 'rgba(6,182,212,0.15)', color: '#06b6d4', icon: '🤝', label: 'Fulfillment Scheduled' },
+    pickupinprogress: { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', icon: '🚚', label: 'Pickup In Progress' },
+    verified: { bg: 'rgba(34,197,94,0.15)', color: '#22c55e', icon: '✓', label: 'Verified' },
     rejected: { bg: 'rgba(239,68,68,0.15)', color: '#f87171', icon: '❌', label: 'Rejected' },
     fulfilled: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa', icon: '🚚', label: 'Completed' },
+    completed: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa', icon: '🚚', label: 'Completed' },
+    done: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa', icon: '🚚', label: 'Completed' },
   };
-  const s = map[status] || map.pending;
+  const s = map[sNorm] || map.pending;
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -136,7 +161,7 @@ function QrScannerComponent({ onScanSuccess, onScanError }) {
 }
 
 export default function NgoDashboard() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [ngo, setNgo] = useState(null);
   const [requests, setRequests] = useState([]);
@@ -276,6 +301,13 @@ export default function NgoDashboard() {
     return () => { active = false; }; // cleanup: ignore stale responses
   }, []);
 
+  // Fetch updated user profile (like verification status) on mount
+  useEffect(() => {
+    if (refreshUser) {
+      refreshUser();
+    }
+  }, [refreshUser]);
+
   // Listen for socket notification events to trigger real-time dashboard data refresh
   useEffect(() => {
     const handleNotification = (e) => {
@@ -291,16 +323,21 @@ export default function NgoDashboard() {
          notification.type === 'DONATION_COMPLETED' ||
          notification.type === 'NEW_DONATION_ASSIGNED' ||
          notification.type === 'DONATION_CREATED' ||
-         notification.type === 'DONATION_REJECTED')
+         notification.type === 'DONATION_REJECTED' ||
+         notification.type === 'NGO_VERIFIED' ||
+         notification.type === 'USER_VERIFIED')
       ) {
         fetchData();
+        if ((notification.type === 'NGO_VERIFIED' || notification.type === 'USER_VERIFIED') && refreshUser) {
+          refreshUser();
+        }
       }
     };
     window.addEventListener('notification-received', handleNotification);
     return () => {
       window.removeEventListener('notification-received', handleNotification);
     };
-  }, [fetchData]);
+  }, [fetchData, refreshUser]);
 
   const handleLogout = async () => {
     await logout();
@@ -332,6 +369,11 @@ export default function NgoDashboard() {
 
     if (!form.purpose.trim()) { showToast('Please describe the purpose of this request', 'error'); return; }
     if (!form.deliveryAddress.trim()) { showToast('Delivery address is required', 'error'); return; }
+    if (!form.phoneNumber.trim()) { showToast('Phone number is required', 'error'); return; }
+    else if (!/^\+?[0-9]{10,15}$/.test(form.phoneNumber.replace(/[\s-()]/g, ''))) {
+      showToast('Please enter a valid phone number (e.g., +919876543210)', 'error');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -378,17 +420,15 @@ export default function NgoDashboard() {
     }
   };
 
-  const filteredRequests = statusFilter === 'all'
-    ? requests
-    : requests.filter(r => r.status === statusFilter);
+  const filteredRequests = requests.filter(r => isRequestStatusMatch(r.status, statusFilter));
 
   const avatarLetter = (user?.firstName || 'N')[0].toUpperCase();
 
   const statsCards = [
     { label: 'Total Requests', value: requests.length, icon: '📋', grad: 'var(--grad-primary)' },
-    { label: 'Pending', value: requests.filter(r => r.status === 'pending').length, icon: '⏳', grad: 'linear-gradient(135deg,#eab308,#d97706)' },
-    { label: 'Approved', value: requests.filter(r => r.status === 'approved').length, icon: '✅', grad: 'var(--grad-green)' },
-    { label: 'Completed', value: requests.filter(r => r.status === 'fulfilled').length, icon: '🚚', grad: 'var(--grad-purple)' },
+    { label: 'Pending', value: requests.filter(r => isRequestStatusMatch(r.status, 'pending')).length, icon: '⏳', grad: 'linear-gradient(135deg,#eab308,#d97706)' },
+    { label: 'Approved', value: requests.filter(r => isRequestStatusMatch(r.status, 'approved')).length, icon: '✅', grad: 'var(--grad-green)' },
+    { label: 'Completed', value: requests.filter(r => isRequestStatusMatch(r.status, 'fulfilled')).length, icon: '🚚', grad: 'var(--grad-purple)' },
   ];
 
   return (
@@ -840,7 +880,7 @@ export default function NgoDashboard() {
                   {s === 'all' ? 'All' : s === 'fulfilled' ? 'Completed' : s.charAt(0).toUpperCase() + s.slice(1)}
                   {s !== 'all' && (
                     <span style={{ marginLeft: 6, background: 'rgba(255,255,255,0.08)', padding: '0 6px', borderRadius: 99, fontSize: '0.7rem' }}>
-                      {requests.filter(r => r.status === s).length}
+                      {requests.filter(r => isRequestStatusMatch(r.status, s)).length}
                     </span>
                   )}
                 </button>
@@ -947,7 +987,7 @@ export default function NgoDashboard() {
                             </div>
                           </div>
 
-                          {req.status !== 'fulfilled' && (
+                          {!isRequestStatusMatch(req.status, 'fulfilled') && (
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
                               <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                                 💡 Ask the donor for their <strong style={{ color: 'var(--color-orange)' }}>6-digit code</strong> or scan their QR to verify delivery.

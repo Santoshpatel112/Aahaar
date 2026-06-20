@@ -24,7 +24,7 @@ const foodInfoSchema = new mongoose.Schema({
   ngoPreference: { type: mongoose.Schema.Types.Mixed, ref: 'Ngo', default: "random" },
   pickedUpByNgo: { type: mongoose.Schema.Types.ObjectId, ref: 'Ngo' },
   adminInReview:{type:Boolean,default:false}, 
-  status: { type: String, enum: ['pending','approved','rejected','done','PENDING_NGO_ACCEPTANCE','NGO_ACCEPTED','PICKUP_IN_PROGRESS','VERIFIED','COMPLETED'], default: 'pending' },
+  status: { type: String, enum: ['pending','approved','rejected','done','fulfilled','CREATED','PENDING_NGO_ACCEPTANCE','NGO_ACCEPTED','REQUEST_ACCEPTED','PICKUP_IN_PROGRESS','VERIFIED','COMPLETED'], default: 'pending' },
   isApproved:{type:Boolean,default:false},
   verificationToken: { type: String },
   approvedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User'},

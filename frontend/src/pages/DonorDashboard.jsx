@@ -48,7 +48,7 @@ const normalizeStatusForFilter = (status) => {
 };
 
 export default function DonorDashboard() {
-  const { user, logout, uploadAadhaar } = useAuth();
+  const { user, logout, uploadAadhaar, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [donations, setDonations] = useState([]);
@@ -107,6 +107,13 @@ export default function DonorDashboard() {
     return () => { active = false; };
   }, [fetchData]);
 
+  // Fetch updated user profile (like verification status) on mount
+  useEffect(() => {
+    if (refreshUser) {
+      refreshUser();
+    }
+  }, [refreshUser]);
+
   // Listen for socket notification events to trigger real-time dashboard data refresh
   useEffect(() => {
     const handleNotification = (e) => {
@@ -118,16 +125,21 @@ export default function DonorDashboard() {
          notification.type === 'FOOD_REQUEST_FULFILLED' ||
          notification.type === 'DONATION_APPROVED' ||
          notification.type === 'DONATION_REJECTED' ||
-         notification.type === 'DONATION_COMPLETED')
+         notification.type === 'DONATION_COMPLETED' ||
+         notification.type === 'USER_VERIFIED')
       ) {
         fetchData();
+        if (notification.type === 'USER_VERIFIED' && refreshUser) {
+          refreshUser();
+        }
       }
     };
     window.addEventListener('notification-received', handleNotification);
     return () => {
       window.removeEventListener('notification-received', handleNotification);
     };
-  }, [fetchData]);
+  }, [fetchData, refreshUser]);
+
 
   // Handle auto-opening the Fulfill Request modal when redirected from Navbar notifications dropdown
   useEffect(() => {
@@ -187,13 +199,47 @@ export default function DonorDashboard() {
     navigate('/');
   };
 
-  const total = donations.length;
+  const completedFulfillmentsList = fulfillments.filter(f => 
+    ['fulfilled', 'completed', 'done'].includes((f.status || '').toLowerCase())
+  );
+
+  const completedFulfillments = completedFulfillmentsList.length;
+
+  const allDonationsList = [
+    ...donations.map(d => ({ ...d, isFulfillment: false })),
+    ...completedFulfillmentsList.map(f => ({
+      ...f,
+      isFulfillment: true,
+      status: 'done',
+      foodItemDetails: f.foodItemsNeeded?.map(it => ({
+        foodName: it.foodName,
+        quantity: it.quantity,
+        quantityType: it.quantityType,
+        category: it.category || 'Fulfillment'
+      })),
+      pickedUpByNgo: f.ngoId ? {
+        ngoName: f.ngoId.ngoName,
+        ngoPhone: f.ngoId.ngoPhone || f.contactDetails?.phoneNumber,
+        ngoEmail: f.ngoId.ngoEmail || f.contactDetails?.email,
+        ngoAddress: f.ngoId.ngoAddress || f.contactDetails?.deliveryAddress,
+        ngoCity: f.ngoId.ngoCity || f.contactDetails?.city
+      } : null,
+      contactDetails: {
+        city: f.contactDetails?.city || f.ngoId?.ngoCity,
+        contactPersonName: f.contactDetails?.contactPersonName || f.ngoId?.ngoName,
+        fullAddress: f.contactDetails?.deliveryAddress || f.ngoId?.ngoAddress,
+      },
+      completedAt: f.updatedAt || f.createdAt
+    }))
+  ];
+
+  const total = donations.length + completedFulfillments;
   const pending = donations.filter(d => normalizeStatusForFilter(d.status) === 'pending').length;
   const approved = donations.filter(d => normalizeStatusForFilter(d.status) === 'approved').length;
   const rejected = donations.filter(d => normalizeStatusForFilter(d.status) === 'rejected').length;
-  const done = donations.filter(d => normalizeStatusForFilter(d.status) === 'done').length;
+  const done = donations.filter(d => normalizeStatusForFilter(d.status) === 'done').length + completedFulfillments;
 
-  const filtered = filter === 'all' ? donations : donations.filter(d => normalizeStatusForFilter(d.status) === filter);
+  const filtered = filter === 'all' ? allDonationsList : allDonationsList.filter(d => normalizeStatusForFilter(d.status) === filter);
 
   const stats = [
     { label: 'Total Donated', value: total, icon: '📦', grad: 'var(--grad-primary)', sub: 'All time' },
@@ -238,13 +284,13 @@ export default function DonorDashboard() {
 
         <div className="dashboard-sidebar__nav-section-title" style={{ marginTop: 8 }}>Impact</div>
         <div style={{ padding: '12px 14px', background: 'rgba(249,115,22,0.06)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(249,115,22,0.15)', margin: '0 0 12px' }}>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--color-orange)' }}>{approved}</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--color-orange)' }}>{approved + done}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>Donations Approved</div>
           <div style={{ marginTop: 8, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)' }}>
-            <div style={{ height: '100%', width: total > 0 ? `${(approved / total) * 100}%` : '0%', background: 'var(--grad-primary)', borderRadius: 99, transition: 'width 1s ease' }} />
+            <div style={{ height: '100%', width: total > 0 ? `${((approved + done) / total) * 100}%` : '0%', background: 'var(--grad-primary)', borderRadius: 99, transition: 'width 1s ease' }} />
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
-            {total > 0 ? Math.round((approved / total) * 100) : 0}% success rate
+            {total > 0 ? Math.round(((approved + done) / total) * 100) : 0}% success rate
           </div>
         </div>
 
@@ -281,6 +327,26 @@ export default function DonorDashboard() {
 
       {/* Main */}
       <main className="dashboard-main">
+        {/* Mobile Navigation */}
+        <div className="dashboard-mobile-nav">
+          <Link to="/donate" className="dashboard-mobile-nav-item dashboard-mobile-nav-item--active">
+            ➕ Donate Food
+          </Link>
+          <Link to="/ngo-dashboard" className="dashboard-mobile-nav-item">
+            🏢 NGO Portal
+          </Link>
+          <Link to="/" className="dashboard-mobile-nav-item">
+            🏠 Home
+          </Link>
+          <button 
+            className="dashboard-mobile-nav-item"
+            onClick={handleLogout}
+            style={{ color: 'var(--color-red)', border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.05)' }}
+          >
+            🚪 Logout
+          </button>
+        </div>
+
         {/* Header */}
         <div className="dashboard-header">
           <div>
@@ -404,7 +470,7 @@ export default function DonorDashboard() {
                 {opt === 'all' ? 'All' : opt === 'done' ? 'Completed' : opt.charAt(0).toUpperCase() + opt.slice(1)}
                 {opt !== 'all' && (
                   <span style={{ marginLeft: 6, background: 'rgba(255,255,255,0.1)', padding: '0px 6px', borderRadius: 99, fontSize: '0.7rem' }}>
-                    {donations.filter(d => normalizeStatusForFilter(d.status) === opt).length}
+                    {allDonationsList.filter(d => normalizeStatusForFilter(d.status) === opt).length}
                   </span>
                 )}
               </button>
@@ -541,10 +607,10 @@ export default function DonorDashboard() {
                     <span style={{ 
                       display: 'inline-flex', alignItems: 'center', gap: 5,
                       padding: '4px 12px', borderRadius: 99, fontSize: '0.78rem', fontWeight: 700,
-                      background: ful.status === 'fulfilled' ? 'rgba(139,92,246,0.15)' : 'rgba(59,130,246,0.15)',
-                      color: ful.status === 'fulfilled' ? '#a78bfa' : '#60a5fa'
+                      background: ['fulfilled', 'completed', 'done'].includes((ful.status || '').toLowerCase()) ? 'rgba(139,92,246,0.15)' : 'rgba(59,130,246,0.15)',
+                      color: ['fulfilled', 'completed', 'done'].includes((ful.status || '').toLowerCase()) ? '#a78bfa' : '#60a5fa'
                     }}>
-                      {ful.status === 'fulfilled' ? '🚚 Completed' : '⏳ Accepted'}
+                      {['fulfilled', 'completed', 'done'].includes((ful.status || '').toLowerCase()) ? '🚚 Completed' : '⏳ Accepted'}
                     </span>
                   </div>
 
@@ -569,7 +635,7 @@ export default function DonorDashboard() {
                     </div>
                   )}
 
-                  {ful.status !== 'fulfilled' && (
+                  {!['fulfilled', 'completed', 'done'].includes((ful.status || '').toLowerCase()) && (
                     <div className="donation-card__actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
                       <button 
                         className="btn-teal" 
@@ -807,7 +873,7 @@ export default function DonorDashboard() {
                   🤝 Recipient Information
                 </div>
                 <div style={{ fontSize: '0.85rem', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
-                  {viewDetails.status === 'done' ? (
+                  {['done', 'completed', 'fulfilled'].includes((viewDetails.status || '').toLowerCase()) ? (
                     viewDetails.pickedUpByNgo ? (
                       <div>
                         <div>NGO: <strong style={{ color: 'var(--text-primary)' }}>{viewDetails.pickedUpByNgo.ngoName}</strong></div>

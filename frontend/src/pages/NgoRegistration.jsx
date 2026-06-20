@@ -184,7 +184,7 @@ export default function NgoRegistration() {
     if (!form.ngoEmail.trim()) errs.ngoEmail = 'Required';
     else if (!/\S+@\S+\.\S+/.test(form.ngoEmail)) errs.ngoEmail = 'Invalid email';
     if (!form.ngoPhone.trim()) errs.ngoPhone = 'Required';
-    else if (!/^\d{10}$/.test(form.ngoPhone.replace(/\s/g, ''))) errs.ngoPhone = 'Enter a valid 10-digit number';
+    else if (!/^\+?[0-9]{10,15}$/.test(form.ngoPhone.replace(/[\s-()]/g, ''))) errs.ngoPhone = 'Enter a valid phone number (e.g. +919876543210)';
     if (!form.ngoAddress.trim()) errs.ngoAddress = 'Required';
     if (!form.ngoCity.trim()) errs.ngoCity = 'Required';
     if (!form.ngoState.trim()) errs.ngoState = 'Required';
