@@ -225,7 +225,17 @@ const deleteUser = asyncHandler(async (req, res) => {
   }
   
   await User.deleteOne({ _id: userId });
-  
+
+  // Emit a real-time force-logout event to the user if they're connected via socket
+  try {
+    // import is at top-level in this file environment; require direct import to avoid circular deps
+    const { emitToUser } = await import('../sockets/socket.js');
+    emitToUser(userId, 'force-logout', { reason: 'deleted_by_admin' });
+  } catch (err) {
+    // don't block delete on socket errors
+    console.warn('Failed to emit force-logout socket event:', err);
+  }
+
   res.status(200).json({
     message: "User deleted successfully"
   });

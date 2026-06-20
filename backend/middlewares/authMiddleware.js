@@ -8,7 +8,19 @@ const protect = asyncHandler(async(req, res, next) => {
     if (token) {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            req.user = await User.findById(decoded.userId).select('-password');
+            const user = await User.findById(decoded.userId).select('-password');
+            if (!user) {
+                // clear cookie on server-side so client token is invalidated
+                res.cookie('jwt', '', {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV !== 'development',
+                    sameSite: process.env.NODE_ENV !== 'development' ? 'None' : 'Lax',
+                    expires: new Date(0),
+                });
+                res.status(401);
+                throw new Error('Not authorized, user not found');
+            }
+            req.user = user;
             next();
         } catch (error) {
             res.status(401);
