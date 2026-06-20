@@ -340,6 +340,30 @@ select.form-input option {
   gap: 4px;
 }
 
+/* react-select location fields */
+.location-select__control {
+  font-size: 0.95rem;
+}
+
+body.light-theme .location-select__control {
+  background: rgba(15, 23, 42, 0.03) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+body.light-theme .location-select__menu {
+  background: #fff !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+body.light-theme .location-select__option {
+  color: #0f172a !important;
+}
+
+body.light-theme .location-select__single-value,
+body.light-theme .location-select__input-container {
+  color: #0f172a !important;
+}
+
 /* Skeleton loader */
 .skeleton {
   background: linear-gradient(90deg,

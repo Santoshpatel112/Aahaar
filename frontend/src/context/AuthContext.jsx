@@ -86,6 +86,10 @@ export function AuthProvider({ children }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
       return { success: true, user: userData };
     } catch (err) {
+      if (err.response?.status === 401) {
+        setUser(null);
+        return { success: false, unauthorized: true };
+      }
       console.error('Failed to refresh user profile:', err);
       return { success: false, error: err.response?.data?.message || 'Failed to refresh user profile.' };
     }
