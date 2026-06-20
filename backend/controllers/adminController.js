@@ -586,10 +586,28 @@ const approveNgoFoodRequest = asyncHandler(async (req, res) => {
   const request = await NgoFoodRequest.findById(id);
   if (!request) { res.status(404); throw new Error('Request not found'); }
   if (request.status !== 'pending') { res.status(400); throw new Error('Request already processed'); }
+
+  // Mark as approved by admin
   request.status = 'approved';
   request.approvedBy = req.user._id;
   request.approvedAt = new Date();
   request.adminInReview = false;
+
+  // Ensure a verification token exists so admin-approved requests expose a QR/token for verification later
+  if (!request.verificationToken) {
+    const generateUniqueRequestToken = async () => {
+      let token;
+      let exists = true;
+      while (exists) {
+        token = Math.floor(100000 + Math.random() * 900000).toString();
+        const found = await NgoFoodRequest.findOne({ verificationToken: token });
+        if (!found) exists = false;
+      }
+      return token;
+    };
+    request.verificationToken = await generateUniqueRequestToken();
+  }
+
   await request.save();
 
   if (request.requestedBy) {
@@ -694,6 +712,29 @@ const toggleNgoRequestReview = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Review status toggled', request });
 });
 
+// Search by token (admin) - returns matching FoodInfo and NgoFoodRequest with populated details
+const searchByToken = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  if (!token) {
+    res.status(400);
+    throw new Error('Token is required');
+  }
+  const tokenUpper = token.trim().toUpperCase();
+
+  const donation = await FoodInfo.findOne({ verificationToken: tokenUpper })
+    .populate({ path: 'foodItemDetails.donorId', select: 'firstName surname email phone city isVerified' })
+    .populate({ path: 'pickedUpByNgo', select: 'ngoName ngoEmail ngoPhone ngoCity isApproved' })
+    .lean();
+
+  const request = await NgoFoodRequest.findOne({ verificationToken: tokenUpper })
+    .populate('ngoId', 'ngoName ngoEmail ngoPhone ngoCity ngoState isApproved')
+    .populate('requestedBy', 'firstName surname email')
+    .populate('acceptedBy', 'firstName surname email phone')
+    .lean();
+
+  return res.status(200).json({ donation, request, message: 'Search results' });
+});
+
 export { 
   getAllUsers, 
   makeUserAdmin, 
@@ -714,5 +755,6 @@ export {
   approveNgoFoodRequest,
   rejectNgoFoodRequest,
   fulfillNgoFoodRequest,
-  toggleNgoRequestReview
+  toggleNgoRequestReview,
+  searchByToken
 };

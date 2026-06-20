@@ -21,7 +21,8 @@ import {
   approveNgoFoodRequest,
   rejectNgoFoodRequest,
   fulfillNgoFoodRequest,
-  toggleNgoRequestReview
+ toggleNgoRequestReview,
+ searchByToken
 } from "../controllers/adminController.js";
 
 const router = express.Router();
@@ -57,5 +58,8 @@ router.route('/ngo-food-requests/:id/approve').put(approveNgoFoodRequest);
 router.route('/ngo-food-requests/:id/reject').put(rejectNgoFoodRequest);
 router.route('/ngo-food-requests/:id/fulfill').put(fulfillNgoFoodRequest);
 router.route('/ngo-food-requests/:id/toggle-review').put(toggleNgoRequestReview);
+
+// Admin search by token (donation or NGO request)
+router.route('/search-by-token/:token').get(searchByToken);
 
 export default router;
