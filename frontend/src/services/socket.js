@@ -35,9 +35,11 @@ export const connectSocket = (userId) => {
   // Handle forced logout initiated by server (e.g., account deleted)
   socket.on('force-logout', (payload) => {
     console.log('Received force-logout event:', payload);
-    showToast('Your account session was ended. Redirecting to home...', 'error');
-    // Notify app to perform logout and redirect
-    const event = new CustomEvent('force-logout', { detail: payload });
+    const message = payload?.reason === 'deleted_by_admin'
+      ? 'Your account was removed by an administrator. You have been signed out.'
+      : 'Your session was ended. Redirecting to home...';
+    showToast(message, 'error');
+    const event = new CustomEvent('force-logout', { detail: { ...payload, toastShown: true } });
     window.dispatchEvent(event);
   });
 

@@ -37,14 +37,24 @@ function AppRoutes() {
 
   // Refresh user profile once on app mount if user exists
   useEffect(() => {
-    if (user && user._id && refreshUser) refreshUser();
+    if (user?._id && refreshUser) refreshUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshUser]);
 
-  // Force-logout handler (triggered by socket -> dispatches window event)
+  // Force-logout handler (triggered by socket or 401 interceptor)
   useEffect(() => {
-    const handleLogoutEvent = (e) => {
-      if (logout) logout();
+    const handleLogoutEvent = async (e) => {
+      const reason = e?.detail?.reason;
+      if (reason === 'deleted_by_admin' && !e?.detail?.toastShown) {
+        showToast('Your account was removed by an administrator. You have been signed out.', 'error');
+      } else if (e?.type === 'auth-unauthorized') {
+        const msg = e?.detail?.reason === 'account_removed'
+          ? 'Your account is no longer available. You have been signed out.'
+          : 'Your session expired. You have been signed out.';
+        showToast(msg, 'error');
+      }
+      if (logout) await logout();
+      disconnectSocket();
       try { navigate('/', { replace: true }); } catch { window.location = '/'; }
     };
     window.addEventListener('force-logout', handleLogoutEvent);

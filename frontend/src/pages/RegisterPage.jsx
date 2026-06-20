@@ -2,16 +2,9 @@ import { useState, Fragment } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { showToast } from '../components/Toast';
+import LocationSelectFields from '../components/LocationSelectFields';
 
 const STEPS = ['Account Info', 'Personal Details', 'Location', 'Identity Verification'];
-
-const INDIAN_STATES = [
-  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat',
-  'Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh',
-  'Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab',
-  'Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh',
-  'Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh','Puducherry'
-];
 
 export default function RegisterPage() {
   const { register, uploadAadhaar } = useAuth();
@@ -20,7 +13,7 @@ export default function RegisterPage() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     firstName: '', surname: '', email: '', password: '', confirmPassword: '',
-    age: '', phone: '', city: '', state: '', country: 'India',
+    age: '', phone: '', city: '', state: '', stateCode: '', country: 'India',
   });
   const [errors, setErrors] = useState({});
   const [showPass, setShowPass] = useState(false);
@@ -51,9 +44,8 @@ export default function RegisterPage() {
       else if (!/^\+?[0-9]{10,15}$/.test(form.phone.replace(/[\s-()]/g, ''))) errs.phone = 'Enter a valid phone number (e.g. +919876543210)';
     }
     if (s === 2) {
-      if (!form.city.trim()) errs.city = 'Required';
       if (!form.state) errs.state = 'Required';
-      if (!form.country.trim()) errs.country = 'Required';
+      if (!form.city.trim()) errs.city = 'Required';
     }
     return errs;
   };
@@ -275,26 +267,20 @@ export default function RegisterPage() {
           {/* Step 2 — Location */}
           {step === 2 && (
             <div className="auth-card__fields" style={{ animation: 'fadeInUp 0.3s ease' }}>
-              <div className="form-group">
-                <label className="form-label">City</label>
-                <input name="city" type="text" className={`form-input ${errors.city ? 'error' : ''}`}
-                  placeholder="Mumbai" value={form.city} onChange={handleChange} />
-                {errors.city && <span className="form-error">⚠ {errors.city}</span>}
-              </div>
-              <div className="form-group">
-                <label className="form-label">State</label>
-                <select name="state" className={`form-input ${errors.state ? 'error' : ''}`} value={form.state} onChange={handleChange}>
-                  <option value="">Select state</option>
-                  {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-                {errors.state && <span className="form-error">⚠ {errors.state}</span>}
-              </div>
-              <div className="form-group">
-                <label className="form-label">Country</label>
-                <input name="country" type="text" className={`form-input ${errors.country ? 'error' : ''}`}
-                  placeholder="India" value={form.country} onChange={handleChange} />
-                {errors.country && <span className="form-error">⚠ {errors.country}</span>}
-              </div>
+              <LocationSelectFields
+                stateCode={form.stateCode}
+                state={form.state}
+                city={form.city}
+                errors={errors}
+                onLocationChange={({ country, stateCode, state, city }) => {
+                  setForm((f) => ({ ...f, country, stateCode, state, city }));
+                  setErrors((prev) => ({
+                    ...prev,
+                    ...(state !== undefined && state ? { state: '' } : {}),
+                    ...(city !== undefined && city ? { city: '' } : {}),
+                  }));
+                }}
+              />
               {errors.submit && <div className="auth-error-box">⚠️ {errors.submit}</div>}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" onClick={prevStep} className="btn-ghost" style={{ flex: 1, justifyContent: 'center', padding: '13px' }}>← Back</button>
