@@ -11,6 +11,7 @@ import {
   approveNgo,
   getFoodInfoByCity,
   verifyUser,
+  verifyUserPan,
   getUsersBasedOnCity,
   getNgoBasedOnCity,
   updateFoodInfoQuantity,
@@ -50,6 +51,7 @@ router.route('/getFoodInfoByCity').get(protect, getFoodInfoByCity);
 router.route('/ngos-based-city').get(getNgoBasedOnCity);
 router.route('/approve-ngo/:id').put(approveNgo);
 router.route('/verify-user/:id').put(verifyUser);
+router.route('/verify-pan/:id').put(verifyUserPan);
 router.route('/users-based-city').get(getUsersBasedOnCity);
 
 // Admin NGO food request management routes

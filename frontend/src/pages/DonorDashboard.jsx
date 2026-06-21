@@ -91,6 +91,12 @@ export default function DonorDashboard() {
   const [acceptModal, setAcceptModal] = useState(null);
   const [expectedDate, setExpectedDate] = useState('');
   const [accepting, setAccepting] = useState(false);
+  const [downloadingReceiptId, setDownloadingReceiptId] = useState(null);
+  const [panEdit, setPanEdit] = useState(false);
+  const [panValue, setPanValue] = useState(user?.panNumber || '');
+  const [savingPan, setSavingPan] = useState(false);
+  const [panFile, setPanFile] = useState(null);
+
 
   const donorId = user?._id || user?.id;
 
@@ -232,6 +238,72 @@ export default function DonorDashboard() {
       showToast(err.response?.data?.message || err.message || 'Failed to accept request', 'error');
     } finally {
       setAccepting(false);
+    }
+  };
+
+  const handleSavePan = async (e) => {
+    e.preventDefault();
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!panRegex.test(panValue.trim().toUpperCase())) {
+      showToast('Please enter a valid 10-character PAN (e.g. ABCDE1234F)', 'error');
+      return;
+    }
+
+    if (!panFile && !user?.panVerificationDocument) {
+      showToast('Please upload a PAN card verification document (Image or PDF)', 'error');
+      return;
+    }
+
+    setSavingPan(true);
+    try {
+      const formData = new FormData();
+      formData.append('panNumber', panValue.trim().toUpperCase());
+      if (panFile) {
+        formData.append('panVerificationDocument', panFile);
+      }
+
+      await api.post('/aahar/users/user-pan-document', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      showToast('PAN details and document submitted successfully! Awaiting admin verification. ⏳', 'success');
+      setPanEdit(false);
+      setPanFile(null);
+      if (refreshUser) {
+        await refreshUser();
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to submit PAN verification request', 'error');
+    } finally {
+      setSavingPan(false);
+    }
+  };
+
+  const handleDownloadReceipt = async (donationId) => {
+    setDownloadingReceiptId(donationId);
+    try {
+      showToast('Compiling and generating PDF receipt... ⏳', 'info');
+      const res = await api.get(`/aahar/foodInfo/receipt/${donationId}`, {
+        responseType: 'blob'
+      });
+      
+      const file = new Blob([res.data], { type: 'application/pdf' });
+      const fileURL = URL.createObjectURL(file);
+      
+      const link = document.createElement('a');
+      link.href = fileURL;
+      link.setAttribute('download', `Donation_Receipt_${donationId.slice(-6).toUpperCase()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Tax receipt downloaded successfully! 📄', 'success');
+    } catch (err) {
+      console.error("Failed to download receipt:", err);
+      showToast(err.response?.data?.message || 'Could not download receipt. Please check your network connection.', 'error');
+    } finally {
+      setDownloadingReceiptId(null);
     }
   };
 
@@ -531,6 +603,172 @@ export default function DonorDashboard() {
           </div>
         )}
 
+        {/* Tax Exemption (PAN) Profile Card */}
+        <div style={{
+          background: 'rgba(17,24,39,0.7)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '24px 28px',
+          marginBottom: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 20,
+          borderColor: user?.isPanVerified || user?.panVerificationStatus === 'approved' ? 'rgba(34,197,94,0.3)' : user?.panVerificationStatus === 'pending' ? 'rgba(234,179,8,0.3)' : user?.panVerificationStatus === 'rejected' ? 'rgba(239,68,68,0.3)' : 'rgba(249,115,22,0.2)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* subtle decorative background glow */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: 120,
+            height: 120,
+            background: `radial-gradient(circle, ${user?.isPanVerified || user?.panVerificationStatus === 'approved' ? 'rgba(34,197,94,0.15)' : user?.panVerificationStatus === 'pending' ? 'rgba(234,179,8,0.15)' : user?.panVerificationStatus === 'rejected' ? 'rgba(239,68,68,0.15)' : 'rgba(249,115,22,0.1)'} 0%, transparent 70%)`,
+            pointerEvents: 'none'
+          }} />
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <span style={{ fontSize: '1.25rem' }}>📄</span>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Section 80G Tax Exemption Profile (PAN)
+                </h3>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                Provide your Permanent Account Number (PAN) and upload its document. Once verified by our admin, you will receive legal tax exemption benefits under Section 80G for all completed donations.
+              </p>
+            </div>
+            
+            <div style={{ 
+              fontSize: '0.8rem', 
+              fontWeight: 700, 
+              color: user?.isPanVerified || user?.panVerificationStatus === 'approved' ? 'var(--color-green)' : user?.panVerificationStatus === 'pending' ? 'var(--color-yellow)' : user?.panVerificationStatus === 'rejected' ? 'var(--color-red)' : 'var(--color-orange)', 
+              background: `${user?.isPanVerified || user?.panVerificationStatus === 'approved' ? 'var(--color-green)' : user?.panVerificationStatus === 'pending' ? 'var(--color-yellow)' : user?.panVerificationStatus === 'rejected' ? 'var(--color-red)' : 'var(--color-orange)'}15`, 
+              padding: '6px 14px', 
+              borderRadius: 20, 
+              border: `1px solid ${user?.isPanVerified || user?.panVerificationStatus === 'approved' ? 'var(--color-green)' : user?.panVerificationStatus === 'pending' ? 'var(--color-yellow)' : user?.panVerificationStatus === 'rejected' ? 'var(--color-red)' : 'var(--color-orange)'}30`,
+              whiteSpace: 'nowrap'
+            }}>
+              {user?.isPanVerified || user?.panVerificationStatus === 'approved' ? '✓ Verified' : user?.panVerificationStatus === 'pending' ? '⏳ Verification Pending' : user?.panVerificationStatus === 'rejected' ? '✕ Verification Rejected' : '⚠️ No PAN Added'}
+            </div>
+          </div>
+
+          {((panEdit || !user?.panNumber || user?.panVerificationStatus === 'none' || user?.panVerificationStatus === 'rejected')) ? (
+            <form onSubmit={handleSavePan} style={{ display: 'flex', flexDirection: 'column', gap: 16, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                <div className="form-group" style={{ flex: '1 1 250px' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>PAN Card Number *</label>
+                  <input
+                    type="text"
+                    placeholder="Enter 10-character PAN (e.g. ABCDE1234F)"
+                    value={panValue}
+                    onChange={(e) => setPanValue(e.target.value.toUpperCase())}
+                    maxLength={10}
+                    className="form-input"
+                    style={{
+                      padding: '10px 14px',
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      fontFamily: 'monospace',
+                      letterSpacing: 1.5,
+                      color: 'var(--text-primary)',
+                      background: 'rgba(0,0,0,0.2)',
+                      borderColor: 'var(--border-color)',
+                      width: '100%',
+                    }}
+                    required
+                  />
+                </div>
+                
+                <div className="form-group" style={{ flex: '1 1 250px' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>PAN Verification Document (PDF/Image) *</label>
+                  <label className="btn-secondary" style={{ 
+                    padding: '10px 16px', 
+                    fontSize: '0.85rem', 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    gap: 8,
+                    height: '42px',
+                    boxSizing: 'border-box',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)'
+                  }}>
+                    📁 {panFile ? panFile.name : 'Select PDF or Image'}
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      style={{ display: 'none' }}
+                      required={!user?.panVerificationDocument}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 5 * 1024 * 1024) {
+                            showToast('File size must be less than 5MB', 'error');
+                            return;
+                          }
+                          setPanFile(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+                {user?.panNumber && (
+                  <button type="button" className="btn-ghost" style={{ padding: '10px 20px', fontSize: '0.85rem' }} onClick={() => { setPanEdit(false); setPanValue(user?.panNumber || ''); setPanFile(null); }} disabled={savingPan}>
+                    Cancel
+                  </button>
+                )}
+                <button type="submit" className="btn-primary" style={{ padding: '10px 24px', fontSize: '0.85rem', border: 'none', color: '#fff' }} disabled={savingPan}>
+                  {savingPan ? 'Submitting...' : 'Submit to Admin'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              flexWrap: 'wrap', 
+              gap: 16, 
+              borderTop: '1px solid var(--border-color)', 
+              paddingTop: 16 
+            }}>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>PAN Number</div>
+                  <strong style={{ fontFamily: 'monospace', fontSize: '1.1rem', color: 'var(--text-primary)', letterSpacing: 1.5 }}>{user.panNumber}</strong>
+                </div>
+                {user.panVerificationDocument && (
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Verification File</div>
+                    <a href={user.panVerificationDocument} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: 'var(--color-teal)', textDecoration: 'underline', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                      📄 Open Document
+                    </a>
+                  </div>
+                )}
+              </div>
+              
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {user.panVerificationStatus === 'rejected' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginRight: 16 }}>
+                    <span style={{ fontSize: '0.8rem', color: '#f87171', fontWeight: 600 }}>Reason: {user.panRejectedReason}</span>
+                  </div>
+                )}
+                <button className="btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={() => { setPanEdit(true); setPanValue(user.panNumber); }}>
+                  ✏️ Edit PAN / Resubmit
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Stat Cards */}
         <div className="dashboard-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 28 }}>
           {loading ? (
@@ -658,6 +896,30 @@ export default function DonorDashboard() {
                         onClick={() => setViewPass(donation)}
                       >
                         🔑 Pickup Pass
+                      </button>
+                    )}
+                    {normalizeStatusForFilter(donation.status) === 'done' && (
+                      <button 
+                        className="btn-teal" 
+                        style={{ 
+                          fontSize: '0.8rem', 
+                          padding: '7px 14px', 
+                          background: user?.isPanVerified ? 'var(--grad-teal)' : 'rgba(255,255,255,0.05)', 
+                          border: user?.isPanVerified ? 'none' : '1px solid var(--border-color)', 
+                          color: user?.isPanVerified ? '#fff' : 'var(--text-muted)',
+                          cursor: user?.isPanVerified ? 'pointer' : 'not-allowed'
+                        }}
+                        onClick={() => {
+                          if (!user?.isPanVerified) {
+                            showToast('PAN verification is required to download Section 80G tax receipts.', 'warning');
+                            return;
+                          }
+                          handleDownloadReceipt(donation._id);
+                        }}
+                        disabled={downloadingReceiptId === donation._id}
+                        title={!user?.isPanVerified ? "Verify PAN in Profile to download receipt" : "Download Tax Exemption Receipt"}
+                      >
+                        {downloadingReceiptId === donation._id ? '⏳ Downloading...' : '📄 Download Receipt'}
                       </button>
                     )}
                   </div>
@@ -1058,7 +1320,32 @@ export default function DonorDashboard() {
               )}
             </div>
 
-            <div className="modal__actions" style={{ marginTop: 24, borderTop: '1px solid var(--border-color)', paddingTop: 14, justifyContent: 'flex-end' }}>
+            <div className="modal__actions" style={{ marginTop: 24, borderTop: '1px solid var(--border-color)', paddingTop: 14, justifyContent: 'flex-end', gap: 10 }}>
+              {normalizeStatusForFilter(viewDetails.status) === 'done' && (
+                <button 
+                  className="btn-teal" 
+                  style={{ 
+                    fontSize: '0.85rem', 
+                    padding: '8px 18px', 
+                    background: user?.isPanVerified ? 'var(--grad-teal)' : 'rgba(255,255,255,0.05)', 
+                    border: user?.isPanVerified ? 'none' : '1px solid var(--border-color)', 
+                    color: user?.isPanVerified ? '#fff' : 'var(--text-muted)',
+                    cursor: user?.isPanVerified ? 'pointer' : 'not-allowed'
+                  }}
+                  onClick={() => { 
+                    if (!user?.isPanVerified) {
+                      showToast('PAN verification is required to download Section 80G tax receipts.', 'warning');
+                      return;
+                    }
+                    handleDownloadReceipt(viewDetails._id); 
+                    setViewDetails(null); 
+                  }}
+                  disabled={downloadingReceiptId === viewDetails._id}
+                  title={!user?.isPanVerified ? "Verify PAN in Profile to download receipt" : "Download Tax Exemption Receipt"}
+                >
+                  {downloadingReceiptId === viewDetails._id ? '⏳ Downloading...' : '📄 Download Receipt'}
+                </button>
+              )}
               <button className="btn-ghost" onClick={() => setViewDetails(null)}>Close</button>
             </div>
           </div>

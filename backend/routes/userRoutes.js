@@ -8,7 +8,8 @@ import {
   linkUserWallet,
   sendOTP,
   verifyOTP,
-  googleAuth
+  googleAuth,
+  uploadPanDocument
 } from "../controllers/userController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import express from "express";
@@ -28,6 +29,10 @@ router.put("/link-wallet", protect, linkUserWallet);
 router.post("/user-adhar-document", uploadDocumentsToS3.fields([
     { name: 'adharVerificationDocument', maxCount: 1 }
 ]),protect, uploadAdharDocument)
+
+router.post("/user-pan-document", uploadDocumentsToS3.fields([
+    { name: 'panVerificationDocument', maxCount: 1 }
+]), protect, uploadPanDocument)
 
 export default router;
 

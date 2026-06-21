@@ -189,6 +189,80 @@ const uploadAdharDocument = asyncHandler(async (req, res) => {
   }
 });
 
+// pan verification Document upload
+const uploadPanDocument = asyncHandler(async (req, res) => {
+  const files = req.files;
+  const { panNumber } = req.body;
+
+  if (!panNumber) {
+    res.status(400);
+    throw new Error("PAN number is required");
+  }
+
+  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+  if (!panRegex.test(panNumber.trim().toUpperCase())) {
+    res.status(400);
+    throw new Error("Invalid PAN number format");
+  }
+
+  if (files && files.panVerificationDocument) {
+    const fileUrl = getFileUrl(files.panVerificationDocument?.[0]);
+    
+    // Save to database
+    const user = await User.findById(req.user._id);
+    if (user) {
+      user.panNumber = panNumber.trim().toUpperCase();
+      user.panVerificationDocument = fileUrl;
+      user.panVerificationStatus = 'pending';
+      user.isPanVerified = false;
+      user.panRejectedReason = null;
+      await user.save();
+
+      // Notify user
+      await notify({
+        receiverId: user._id,
+        receiverRole: 'donor',
+        title: 'PAN Details Submitted',
+        message: 'Your PAN details and document verification are under review.',
+        type: 'USER_REGISTERED',
+        entityType: 'User',
+        entityId: user._id,
+        priority: 'medium'
+      });
+
+      // Notify all Admins
+      const admins = await User.find({ isAdmin: true });
+      for (const admin of admins) {
+        await notify({
+          receiverId: admin._id,
+          receiverRole: 'admin',
+          title: 'Pending PAN Verification',
+          message: `${user.firstName} uploaded PAN document. Pending verification.`,
+          type: 'PENDING_VERIFICATION',
+          entityType: 'User',
+          entityId: user._id,
+          priority: 'high'
+        });
+      }
+
+      return res.status(200).json({
+        message: "PAN document uploaded and details submitted successfully",
+        panNumber: user.panNumber,
+        panVerificationDocument: fileUrl,
+        panVerificationStatus: 'pending',
+        isPanVerified: false,
+        panRejectedReason: null,
+      });
+    } else {
+      res.status(404);
+      throw new Error("User not found");
+    }
+  } else {
+    res.status(400);
+    throw new Error("No PAN file uploaded");
+  }
+});
+
 const getUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
   if (user) {
@@ -206,6 +280,11 @@ const getUserProfile = asyncHandler(async (req, res) => {
       isAdmin: user.isAdmin,
       adharVerificationDocument: user.adharVerificationDocument,
       profileImage: user.profileImage,
+      panNumber: user.panNumber,
+      panVerificationDocument: user.panVerificationDocument,
+      panVerificationStatus: user.panVerificationStatus,
+      isPanVerified: user.isPanVerified,
+      panRejectedReason: user.panRejectedReason,
     });
   } else {
     res.status(404);
@@ -221,7 +300,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     throw new Error("User not found");
   }
 
-  const { firstName, surname, age, city, state, country, phone } = req.body;
+  const { firstName, surname, age, city, state, country, phone, panNumber } = req.body;
 
   if (firstName !== undefined) user.firstName = firstName;
   if (surname !== undefined) user.surname = surname;
@@ -230,6 +309,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   if (state !== undefined) user.state = state;
   if (country !== undefined) user.country = country;
   if (phone !== undefined) user.phone = phone;
+  if (panNumber !== undefined) user.panNumber = panNumber;
 
   // Handle profile image upload
   if (req.files?.profileImage?.[0]) {
@@ -253,6 +333,11 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     adharVerificationDocument: updatedUser.adharVerificationDocument,
     profileImage: updatedUser.profileImage,
     walletAddress: updatedUser.walletAddress,
+    panNumber: updatedUser.panNumber,
+    panVerificationDocument: updatedUser.panVerificationDocument,
+    panVerificationStatus: updatedUser.panVerificationStatus,
+    isPanVerified: updatedUser.isPanVerified,
+    panRejectedReason: updatedUser.panRejectedReason,
     message: "Profile updated successfully"
   });
 });
@@ -431,6 +516,7 @@ export {
   registerUser,
   logoutUser,
   uploadAdharDocument,
+  uploadPanDocument,
   updateUserProfile,
   getUserProfile,
   linkUserWallet,

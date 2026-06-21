@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import { uploadFoodImages as uploadFoodImagesMiddleware, getFileUrl } from "../s3Config.js";
 import User from "../models/userModel.js";
 import { notify } from "../services/notification.service.js";
+import { generateAndEmailReceipt } from "../services/taxService.js";
 
 const uploadFoodImages = asyncHandler(async (req, res) => {
     const files = req.files;
@@ -304,6 +305,9 @@ const verifyDonationPickup = asyncHandler(async (req, res) => {
 
     await donation.save();
 
+    // Trigger Section 80G PDF receipt compilation and email transmission
+    generateAndEmailReceipt(donation);
+
     // Mark the corresponding NgoFoodRequest as completed (fulfilled)
     if (donation.verificationToken) {
         const request = await NgoFoodRequest.findOne({ verificationToken: donation.verificationToken.toUpperCase() });
@@ -539,6 +543,51 @@ const rejectDirectDonation = asyncHandler(async (req, res) => {
     });
 });
 
+const downloadDonationReceipt = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const donation = await FoodInfo.findById(id);
+    if (!donation) {
+        res.status(404);
+        throw new Error("Donation not found");
+    }
+
+    const donorId = donation.foodItemDetails?.[0]?.donorId;
+    if (!donorId) {
+        res.status(400);
+        throw new Error("No donor associated with this donation");
+    }
+    
+    // Check authorization: only the donor or an admin can download
+    if (req.user._id.toString() !== donorId.toString() && !req.user.isAdmin) {
+        res.status(403);
+        throw new Error("Not authorized to download this receipt");
+    }
+
+    // Check if PAN is verified
+    if (req.user._id.toString() === donorId.toString() && !req.user.isPanVerified) {
+        res.status(403);
+        throw new Error("Your PAN verification is pending or rejected. You cannot download tax receipts until your PAN is verified.");
+    }
+
+    const donor = await User.findById(donorId);
+    if (!donor) {
+        res.status(404);
+        throw new Error("Donor not found");
+    }
+
+    // Resolve or generate tax exemption details
+    const { calculateAndCreateTaxExemption } = await import("../services/taxService.js");
+    const { generateDonationReceipt } = await import("../utils/pdfGenerator.js");
+    const taxExemption = await calculateAndCreateTaxExemption(donation, donorId);
+
+    const pdfBuffer = await generateDonationReceipt(donation, donor, taxExemption);
+    const receiptNo = taxExemption.certificateNumber || `AHR-${donation._id.toString().slice(-6).toUpperCase()}`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=Donation_Receipt_${receiptNo}.pdf`);
+    res.send(pdfBuffer);
+});
+
 export {
     CreateFoodInfo,
     getFoodInfoById,
@@ -548,7 +597,8 @@ export {
     verifyDonationPickup,
     getNgoAssignedDonations,
     acceptDirectDonation,
-    rejectDirectDonation
+    rejectDirectDonation,
+    downloadDonationReceipt
 };
 
 

@@ -5,16 +5,16 @@ import { notify } from "../services/notification.service.js";
 
 const calculateTaxForExemption = asyncHandler(async (req, res) => {
     const foodRates = {
-        'Fruits': 0.35,
-        'Vegetables': 0.35,
-        'Bakery': 0.25,
-        'Dairy': 0.30,
-        'Cooked Meals': 0.40,
-        'Beverages': 0.20,
-        'Packaged Food': 0.25,
-        'Grains': 0.30,
-        'Others': 0.15
-    }
+        'Fruits': 0.50,
+        'Vegetables': 0.50,
+        'Bakery': 0.50,
+        'Dairy': 0.50,
+        'Cooked Meals': 0.50,
+        'Beverages': 0.50,
+        'Packaged Food': 0.50,
+        'Grains': 0.50,
+        'Others': 0.50
+    };
 
     const categoryBaseValues = {
         'Fruits': 50,      
