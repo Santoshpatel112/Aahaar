@@ -1,10 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { showToast } from '../components/Toast';
 
+const loadGoogleScript = () => {
+  return new Promise((resolve) => {
+    if (window.google) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve(true);
+    document.body.appendChild(script);
+  });
+};
+
 export default function LoginPage() {
-  const { login, loading } = useAuth();
+  const { login, googleLogin, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/dashboard';
@@ -12,6 +27,44 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [showPass, setShowPass] = useState(false);
+
+  const handleGoogleResponse = async (response) => {
+    setErrors({});
+    const res = await googleLogin(response.credential);
+    if (res.success) {
+      if (res.data.exists) {
+        showToast(`Welcome back, ${res.data.user.firstName}! 🎉`, 'success');
+        navigate(res.data.user.isAdmin ? '/admin' : from, { replace: true, state: location.state });
+      } else {
+        showToast(`Welcome! Please complete your registration details.`, 'info');
+        navigate('/register', { state: { googleUser: res.data.user, googleCredential: response.credential } });
+      }
+    } else {
+      showToast(res.error || 'Google Login failed', 'error');
+      setErrors({ submit: res.error });
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    loadGoogleScript().then(() => {
+      if (!active) return;
+      if (window.google) {
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          callback: handleGoogleResponse,
+        });
+        window.google.accounts.id.renderButton(
+          document.getElementById('google-login-btn'),
+          { theme: 'outline', size: 'large', width: '100%' }
+        );
+      }
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const validate = () => {
     const errs = {};
@@ -144,6 +197,14 @@ export default function LoginPage() {
             >
               {loading ? <><span className="spinner" /> Signing in...</> : 'Sign In →'}
             </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', margin: '18px 0 12px 0', gap: 10 }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border-color)', opacity: 0.5 }} />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>or</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border-color)', opacity: 0.5 }} />
+            </div>
+
+            <div id="google-login-btn" style={{ width: '100%', minHeight: 40 }} />
           </div>
         </form>
 

@@ -1,4 +1,7 @@
 import User from "../models/userModel.js";
+import OTP from "../models/otpModel.js";
+import { sendOTPEmail } from "../utils/emailHelper.js";
+import { OAuth2Client } from "google-auth-library";
 import { ethers } from "ethers";
 import generateToken from "../utils/token.js";
 import asyncHandler from "../middlewares/asyncHandler.js";
@@ -302,6 +305,138 @@ const linkUserWallet = asyncHandler(async (req, res) => {
   });
 });
 
-export { authUser, registerUser, logoutUser, uploadAdharDocument, updateUserProfile, getUserProfile, linkUserWallet };
+// Send OTP for email verification during registration
+const sendOTP = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const normalizedEmail = email ? email.trim().toLowerCase() : "";
+
+  if (!normalizedEmail) {
+    res.status(400);
+    throw new Error("Email is required");
+  }
+
+  // Check if user already exists
+  const userExists = await User.findOne({ email: normalizedEmail });
+  if (userExists) {
+    res.status(400);
+    throw new Error("User already exists");
+  }
+
+  // Generate 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // Store in DB (delete any existing OTP for this email first)
+  await OTP.deleteMany({ email: normalizedEmail });
+  await OTP.create({ email: normalizedEmail, otp });
+
+  // Send email
+  const emailSent = await sendOTPEmail(normalizedEmail, otp);
+  if (!emailSent) {
+    res.status(500);
+    throw new Error("Failed to send OTP email");
+  }
+
+  res.status(200).json({ message: "OTP sent successfully" });
+});
+
+// Verify OTP for email verification during registration
+const verifyOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  const normalizedEmail = email ? email.trim().toLowerCase() : "";
+
+  if (!normalizedEmail || !otp) {
+    res.status(400);
+    throw new Error("Email and OTP are required");
+  }
+
+  const otpRecord = await OTP.findOne({ email: normalizedEmail, otp });
+  if (!otpRecord) {
+    res.status(400);
+    throw new Error("Invalid or expired OTP");
+  }
+
+  // Delete the OTP once verified to prevent reuse
+  await OTP.deleteMany({ email: normalizedEmail });
+
+  res.status(200).json({ success: true, message: "OTP verified successfully" });
+});
+
+// Authenticate or check registration details via Google OAuth ID Token
+const googleAuth = asyncHandler(async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) {
+    res.status(400);
+    throw new Error("Google credential token is required");
+  }
+
+  // Verify ID Token
+  const client = new OAuth2Client(process.env.GOOGLE_CLINT_ID);
+  let payload;
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLINT_ID,
+    });
+    payload = ticket.getPayload();
+  } catch (err) {
+    console.error("Google ID Token verification failed:", err);
+    res.status(400);
+    throw new Error("Invalid Google credential: " + err.message);
+  }
+
+  const { email, given_name, family_name, picture } = payload;
+  const normalizedEmail = email ? email.trim().toLowerCase() : "";
+
+  // Check if user exists
+  const user = await User.findOne({ email: normalizedEmail });
+
+  if (user) {
+    // User exists -> Log them in!
+    generateToken(res, user._id);
+    res.status(200).json({
+      exists: true,
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        surname: user.surname,
+        email: user.email,
+        age: user.age,
+        city: user.city,
+        state: user.state,
+        country: user.country,
+        phone: user.phone,
+        isVerified: user.isVerified,
+        isAdmin: user.isAdmin,
+        adharVerificationDocument: user.adharVerificationDocument,
+        profileImage: user.profileImage || picture,
+        token: generateToken(res, user._id),
+      }
+    });
+  } else {
+    // User does not exist -> Return details so frontend can complete registration details
+    res.status(200).json({
+      exists: false,
+      user: {
+        email: normalizedEmail,
+        firstName: given_name || "",
+        surname: family_name || "",
+        profileImage: picture || null,
+      }
+    });
+  }
+});
+
+export {
+  authUser,
+  registerUser,
+  logoutUser,
+  uploadAdharDocument,
+  updateUserProfile,
+  getUserProfile,
+  linkUserWallet,
+  sendOTP,
+  verifyOTP,
+  googleAuth
+};
 
 

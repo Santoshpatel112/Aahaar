@@ -51,6 +51,50 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const googleLogin = useCallback(async (credential) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/aahar/users/google-auth', { credential });
+      const data = res.data;
+      if (data.exists) {
+        setUser(data.user);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
+      }
+      return { success: true, data };
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data || 'Google authentication failed.';
+      return { success: false, error: msg };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const sendOTP = useCallback(async (email) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/aahar/users/send-otp', { email });
+      return { success: true, message: res.data?.message || 'OTP sent successfully.' };
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data || 'Failed to send OTP.';
+      return { success: false, error: msg };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const verifyOTP = useCallback(async (email, otp) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/aahar/users/verify-otp', { email, otp });
+      return { success: true, message: res.data?.message || 'OTP verified successfully.' };
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data || 'Invalid OTP.';
+      return { success: false, error: msg };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const uploadAadhaar = useCallback(async (file, currentUser = null) => {
     setLoading(true);
     try {
@@ -107,7 +151,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, login, register, uploadAadhaar, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, isAdmin, loading, login, googleLogin, sendOTP, verifyOTP, register, uploadAadhaar, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
