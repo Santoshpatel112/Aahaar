@@ -130,6 +130,55 @@ const verifyUser = asyncHandler(async (req, res) => {
     }
 })
 
+//verify user PAN
+const verifyUserPan = asyncHandler(async (req, res) => {
+    const userId = req.params.id;
+    const { isApproved, reason } = req.body;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+        return res.status(404).json({ message: "User not found" });
+    }
+
+    if (isApproved) {
+        user.isPanVerified = true;
+        user.panVerificationStatus = 'approved';
+        user.panRejectedReason = null;
+        await user.save();
+
+        await notify({
+            receiverId: user._id,
+            receiverRole: 'donor',
+            title: 'PAN Verified Successfully 🎉',
+            message: 'Your PAN details have been approved. You can now download Section 80G tax benefit certificates.',
+            type: 'USER_VERIFIED',
+            entityType: 'User',
+            entityId: user._id,
+            priority: 'high'
+        });
+
+        res.status(200).json({ success: true, message: "User PAN verified successfully", user });
+    } else {
+        user.isPanVerified = false;
+        user.panVerificationStatus = 'rejected';
+        user.panRejectedReason = reason || 'Invalid PAN document or details';
+        await user.save();
+
+        await notify({
+            receiverId: user._id,
+            receiverRole: 'donor',
+            title: 'PAN Verification Rejected ✕',
+            message: `Your PAN verification request was rejected. Reason: ${user.panRejectedReason}`,
+            type: 'USER_VERIFIED',
+            entityType: 'User',
+            entityId: user._id,
+            priority: 'high'
+        });
+
+        res.status(200).json({ success: true, message: "User PAN verification rejected", user });
+    }
+})
+
 
 
 // @desc    Get all users (admin only)
@@ -447,6 +496,14 @@ const completeFoodDonation = asyncHandler(async (req, res) => {
 
   await donation.save();
 
+  // Trigger Section 80G PDF receipt compilation and email transmission
+  try {
+    const { generateAndEmailReceipt } = await import("../services/taxService.js");
+    generateAndEmailReceipt(donation);
+  } catch (taxErr) {
+    console.error("Failed to trigger generateAndEmailReceipt in admin completeFoodDonation:", taxErr);
+  }
+
   // Notify donor
   const donorId = donation.foodItemDetails?.[0]?.donorId;
   if (donorId) {
@@ -740,6 +797,14 @@ const fulfillNgoFoodRequest = asyncHandler(async (req, res) => {
         donation.status = 'COMPLETED';
         donation.completedAt = new Date();
         await donation.save();
+
+        // Trigger Section 80G PDF receipt compilation and email transmission
+        try {
+          const { generateAndEmailReceipt } = await import("../services/taxService.js");
+          generateAndEmailReceipt(donation);
+        } catch (taxErr) {
+          console.error("Failed to trigger generateAndEmailReceipt in admin fulfillNgoFoodRequest:", taxErr);
+        }
       }
     }
 
@@ -857,6 +922,7 @@ export {
   approveNgo,
   getUsersBasedOnCity,
   verifyUser,
+  verifyUserPan,
   getFoodInfoByCity,
   updateFoodInfoQuantity,
   triggerInReview,

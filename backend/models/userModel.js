@@ -63,6 +63,27 @@ const userSchema = mongoose.Schema(
       type: String,
       default: null,
     },
+    panNumber: {
+      type: String,
+      default: null,
+    },
+    panVerificationDocument: {
+      type: String,
+      default: null,
+    },
+    panVerificationStatus: {
+      type: String,
+      enum: ['none', 'pending', 'approved', 'rejected'],
+      default: 'none',
+    },
+    isPanVerified: {
+      type: Boolean,
+      default: false,
+    },
+    panRejectedReason: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );

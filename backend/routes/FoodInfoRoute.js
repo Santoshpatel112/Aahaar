@@ -1,4 +1,4 @@
-import {CreateFoodInfo,getFoodInfoById,updateFoodInfo,deleteFoodInfo,uploadFoodImages as uploadFoodImagesController,verifyDonationPickup,getNgoAssignedDonations,acceptDirectDonation,rejectDirectDonation} from "../controllers/foodInfoController.js"
+import {CreateFoodInfo,getFoodInfoById,updateFoodInfo,deleteFoodInfo,uploadFoodImages as uploadFoodImagesController,verifyDonationPickup,getNgoAssignedDonations,acceptDirectDonation,rejectDirectDonation,downloadDonationReceipt} from "../controllers/foodInfoController.js"
 import { protect } from "../middlewares/authMiddleware.js";
 import express from "express";
 import { uploadFoodImages } from "../s3Config.js";
@@ -15,4 +15,5 @@ router.route('/verify-pickup/:id').put(protect,verifyDonationPickup);
 router.route('/my-assigned-donations').get(protect,getNgoAssignedDonations);
 router.route('/accept-donation/:id').put(protect,acceptDirectDonation);
 router.route('/reject-donation/:id').put(protect,rejectDirectDonation);
+router.route('/receipt/:id').get(protect, downloadDonationReceipt);
 export default router;

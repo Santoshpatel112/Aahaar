@@ -907,6 +907,15 @@ export default function AdminDashboard() {
   const removeAdmin = async (id) => { try { await api.put(`/aahar/admin/users/${id}/remove-admin`); showToast('Admin rights removed', 'success'); fetchUsers(); } catch { showToast('Failed', 'error'); } };
   const deleteUser = async (id) => { if (!window.confirm('Delete this user permanently?')) return; try { await api.delete(`/aahar/admin/users/${id}`); showToast('User deleted', 'success'); fetchUsers(); } catch { showToast('Failed', 'error'); } };
   const verifyUser = async (id) => { try { await api.put(`/aahar/admin/verify-user/${id}`); showToast('User verified ✓', 'success'); fetchUsers(); } catch { showToast('Failed', 'error'); } };
+  const handleVerifyPan = async (id, isApproved, reason = '') => {
+    try {
+      await api.put(`/aahar/admin/verify-pan/${id}`, { isApproved, reason });
+      showToast(isApproved ? 'PAN verified successfully ✓' : 'PAN verification rejected ✕', 'success');
+      fetchUsers();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to verify PAN', 'error');
+    }
+  };
 
 
   // Donation actions
@@ -1705,8 +1714,8 @@ export default function AdminDashboard() {
             {loading ? (
               <div className="table-container">
                 <table className="admin-table">
-                  <thead><tr><th>User</th><th>Email</th><th>City</th><th>Role</th><th>Verified</th><th>Actions</th></tr></thead>
-                  <tbody>{[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} cols={6} />)}</tbody>
+                  <thead><tr><th>User</th><th>Email</th><th>City</th><th>Role</th><th>Verified</th><th>PAN Status</th><th>Actions</th></tr></thead>
+                  <tbody>{[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} cols={7} />)}</tbody>
                 </table>
               </div>
             ) : filteredUsers.length === 0 ? (
@@ -1715,7 +1724,7 @@ export default function AdminDashboard() {
               <div className="table-container">
                 <table className="admin-table">
                   <thead>
-                    <tr><th>User</th><th>Email</th><th>City</th><th>Role</th><th>Verified</th><th>Actions</th></tr>
+                    <tr><th>User</th><th>Email</th><th>City</th><th>Role</th><th>Verified</th><th>PAN Status</th><th>Actions</th></tr>
                   </thead>
                   <tbody>
                     {filteredUsers.map(u => (
@@ -1753,8 +1762,49 @@ export default function AdminDashboard() {
                           )}
                         </td>
                         <td>
+                          {u.isPanVerified || u.panVerificationStatus === 'approved' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--color-green)', fontWeight: 600 }}>✓ Verified</span>
+                              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{u.panNumber}</span>
+                              {u.panVerificationDocument && (
+                                <a href={u.panVerificationDocument} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: 'var(--color-teal)', textDecoration: 'underline' }}>
+                                  📄 View PAN Card
+                                </a>
+                              )}
+                            </div>
+                          ) : u.panVerificationStatus === 'pending' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--color-yellow)', fontWeight: 600 }}>⏳ Pending Review</span>
+                              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{u.panNumber}</span>
+                              {u.panVerificationDocument && (
+                                <a href={u.panVerificationDocument} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: 'var(--color-teal)', textDecoration: 'underline' }}>
+                                  📄 View PAN Card
+                                </a>
+                              )}
+                            </div>
+                          ) : u.panVerificationStatus === 'rejected' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--color-red)', fontWeight: 600 }}>✕ Rejected</span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{u.panRejectedReason}</span>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No PAN Added</span>
+                          )}
+                        </td>
+                        <td>
                           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                             {!u.isVerified && <ActionBtn icon="✓" label="Verify" onClick={() => verifyUser(u._id)} variant="teal" />}
+                            {u.panVerificationStatus === 'pending' && (
+                              <>
+                                <ActionBtn icon="✓" label="Approve PAN" onClick={() => handleVerifyPan(u._id, true)} variant="green" />
+                                <ActionBtn icon="✕" label="Reject PAN" onClick={() => {
+                                  const reason = prompt("Enter reason for rejecting PAN card:");
+                                  if (reason !== null) {
+                                    handleVerifyPan(u._id, false, reason || 'Invalid document');
+                                  }
+                                }} variant="danger" />
+                              </>
+                            )}
                             {!u.isAdmin
                               ? <ActionBtn icon="⬆" label="Make Admin" onClick={() => makeAdmin(u._id)} />
                               : <ActionBtn icon="⬇" label="Remove Admin" onClick={() => removeAdmin(u._id)} />}
