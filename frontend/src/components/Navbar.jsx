@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { showToast } from './Toast';
 import api from '../api/axios';
 import NotificationBell from './NotificationBell';
+import ConnectWalletButton from './ConnectWalletButton';
 
 export default function Navbar() {
   const { user, isAdmin, logout } = useAuth();
@@ -13,6 +14,8 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const [statsDropdownOpen, setStatsDropdownOpen] = useState(false);
+  const statsDropdownRef = useRef(null);
 
   // Theme state & logic
   const [theme, setTheme] = useState(() => localStorage.getItem('aahaar_theme') || 'dark');
@@ -154,6 +157,9 @@ export default function Navbar() {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
+      if (statsDropdownRef.current && !statsDropdownRef.current.contains(e.target)) {
+        setStatsDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -163,6 +169,7 @@ export default function Navbar() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMenuOpen(false);
     setDropdownOpen(false);
+    setStatsDropdownOpen(false);
   }, [location.pathname]);
 
   const handleLogout = async () => {
@@ -193,9 +200,39 @@ export default function Navbar() {
             <Link to="/about" className={`navbar__link ${isActive('/about') ? 'navbar__link--active' : ''}`}>
               About
             </Link>
-            <Link to="/stats" className={`navbar__link ${isActive('/stats') ? 'navbar__link--active' : ''}`}>
-              Stats
-            </Link>
+            <div className="navbar__user" ref={statsDropdownRef} style={{ display: 'inline-block', position: 'relative' }}>
+              <button
+                type="button"
+                className={`navbar__link ${isActive('/stats') || isActive('/transparency') || isActive('/explorer') ? 'navbar__link--active' : ''}`}
+                onClick={() => setStatsDropdownOpen(!statsDropdownOpen)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '7px 14px',
+                  font: 'inherit',
+                  color: 'inherit'
+                }}
+              >
+                Stats & Ledger <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>▼</span>
+              </button>
+              {statsDropdownOpen && (
+                <div className="navbar__dropdown" style={{ left: 0, right: 'auto', width: 220 }}>
+                  <Link to="/stats" className="navbar__dropdown-item">
+                    Public Stats
+                  </Link>
+                  <Link to="/transparency" className="navbar__dropdown-item">
+                    Transparency Page
+                  </Link>
+                  <Link to="/explorer" className="navbar__dropdown-item">
+                    Blockchain Ledger
+                  </Link>
+                </div>
+              )}
+            </div>
             {user && !isAdmin && (
               <Link to="/dashboard" className={`navbar__link ${isActive('/dashboard') ? 'navbar__link--active' : ''}`}>
                 Dashboard
@@ -225,30 +262,11 @@ export default function Navbar() {
 
           {/* Auth area */}
           <div className="navbar__auth">
-            {/* Theme Toggler */}
-            <button
-              onClick={toggleTheme}
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '50%',
-                width: 38,
-                height: 38,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                fontSize: '1.15rem',
-                color: 'var(--text-primary)',
-                transition: 'all 0.25s',
-                marginRight: 12
-              }}
-              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
-              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-orange)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
-            >
-              {theme === 'dark' ? '☀️' : '🌙'}
-            </button>
+            {user && (
+              <div style={{ marginRight: 12 }}>
+                <ConnectWalletButton />
+              </div>
+            )}
 
             {user && (
               <NotificationBell
@@ -326,6 +344,30 @@ export default function Navbar() {
               </div>
             )}
 
+            {/* Theme Toggler */}
+            <button
+              onClick={toggleTheme}
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '50%',
+                width: 38,
+                height: 38,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '1.15rem',
+                color: 'var(--text-primary)',
+                transition: 'all 0.25s'
+              }}
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-orange)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+
             {/* Hamburger */}
             <button
               className={`navbar__hamburger ${menuOpen ? 'navbar__hamburger--open' : ''}`}
@@ -343,7 +385,14 @@ export default function Navbar() {
         <div className="navbar__mobile-inner">
           <Link to="/" className="navbar__mobile-link">🏠 Home</Link>
           <Link to="/about" className="navbar__mobile-link">📖 About</Link>
-          <Link to="/stats" className="navbar__mobile-link">📊 Stats</Link>
+          
+          <div className="navbar__mobile-divider" />
+          <div style={{ padding: '6px 16px', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Analytics & Ledger</div>
+          <Link to="/stats" className="navbar__mobile-link">Public Stats</Link>
+          <Link to="/transparency" className="navbar__mobile-link">Transparency Page</Link>
+          <Link to="/explorer" className="navbar__mobile-link">Blockchain Ledger</Link>
+          <div className="navbar__mobile-divider" />
+
           {user ? (
             <>
               {!isAdmin && <Link to="/dashboard" className="navbar__mobile-link">📊 Dashboard</Link>}

@@ -4,6 +4,9 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import { showToast } from '../components/Toast';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { useWallet } from '../context/WalletContext';
+import { ethers } from 'ethers';
+
 
 const FOOD_CATEGORIES = [
   'Fruits', 'Vegetables', 'Bakery', 'Dairy', 'Cooked Meals',
@@ -162,6 +165,25 @@ function QrScannerComponent({ onScanSuccess, onScanError }) {
 
 export default function NgoDashboard() {
   const { user, logout, refreshUser } = useAuth();
+  const { contracts, walletAddress, isConnected, connectWallet } = useWallet();
+  const [reputation, setReputation] = useState(0);
+  const [daoProposals, setDaoProposals] = useState([]);
+  const [loadingDao, setLoadingDao] = useState(false);
+
+  useEffect(() => {
+    const fetchNgoReputation = async () => {
+      if (contracts?.ReputationSystem && walletAddress) {
+        try {
+          const rep = await contracts.ReputationSystem.getReputation(walletAddress);
+          setReputation(Number(rep));
+        } catch (err) {
+          console.error("Error fetching NGO reputation:", err);
+        }
+      }
+    };
+    fetchNgoReputation();
+  }, [contracts, walletAddress]);
+
   const navigate = useNavigate();
   const [ngo, setNgo] = useState(null);
   const [requests, setRequests] = useState([]);
@@ -171,6 +193,13 @@ export default function NgoDashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [donationStatusFilter, setDonationStatusFilter] = useState('all');
   const [submitting, setSubmitting] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('ngo_sidebar_collapsed') === 'true');
+
+  const toggleSidebar = () => {
+    const val = !sidebarCollapsed;
+    setSidebarCollapsed(val);
+    localStorage.setItem('ngo_sidebar_collapsed', String(val));
+  };
   
   // Verification Scanner States
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -212,6 +241,120 @@ export default function NgoDashboard() {
     }
   }, []);
 
+  const fetchDaoProposals = useCallback(async () => {
+    if (!contracts?.AahaarDAO) return;
+    setLoadingDao(true);
+    try {
+      const raw = await contracts.AahaarDAO.getAllProposals();
+      const list = await Promise.all(raw.map(async p => {
+        let userHasVoted = false;
+        if (walletAddress) {
+          try {
+            userHasVoted = await contracts.AahaarDAO.hasVoted(Number(p.id), walletAddress);
+          } catch (err) {
+            console.error("Error checking hasVoted:", err);
+          }
+        }
+        return {
+          id: Number(p.id),
+          targetNGO: p.targetNGO,
+          proposalType: Number(p.proposalType),
+          description: p.description,
+          votesFor: Number(p.votesFor),
+          votesAgainst: Number(p.votesAgainst),
+          deadline: new Date(Number(p.deadline) * 1000),
+          executed: p.executed,
+          state: Number(p.state),
+          userHasVoted
+        };
+      }));
+      setDaoProposals(list.reverse());
+    } catch (err) {
+      console.error("Error fetching proposals:", err);
+    } finally {
+      setLoadingDao(false);
+    }
+  }, [contracts, walletAddress]);
+
+  const handleVoteDaoProposal = async (proposalId, support) => {
+    if (!contracts?.AahaarDAO) {
+      showToast("Web3 Contracts not loaded. Please connect your wallet.", "error");
+      return;
+    }
+    setLoadingDao(true);
+    try {
+      showToast(`Submitting your vote (${support ? 'FOR' : 'AGAINST'})... 🦊`, "info");
+      const tx = await contracts.AahaarDAO.vote(proposalId, support);
+      showToast("Confirming vote on Polygon... ⏳", "info");
+      await tx.wait();
+      showToast("Vote successfully cast on the blockchain! 🗳️", "success");
+      fetchDaoProposals();
+    } catch (err) {
+      console.error("Error voting on proposal:", err);
+      showToast(err.reason || err.message || "Failed to submit vote.", "error");
+    } finally {
+      setLoadingDao(false);
+    }
+  };
+
+  const handleExecuteDaoProposal = async (proposalId) => {
+    if (!contracts?.AahaarDAO) {
+      showToast("Web3 Contracts not loaded. Please connect your wallet.", "error");
+      return;
+    }
+    setLoadingDao(true);
+    try {
+      showToast("Executing proposal on the blockchain... 🦊", "info");
+      const tx = await contracts.AahaarDAO.executeProposal(proposalId);
+      showToast("Confirming execution... ⏳", "info");
+      await tx.wait();
+      showToast("Proposal successfully executed! NGO status updated on-chain. 🌟", "success");
+      fetchDaoProposals();
+      fetchData();
+    } catch (err) {
+      console.error("Error executing proposal:", err);
+      showToast(err.reason || err.message || "Failed to execute proposal.", "error");
+    } finally {
+      setLoadingDao(false);
+    }
+  };
+
+  const handleCreateDaoProposal = async (targetNgoAddr, pType, desc) => {
+    if (!contracts?.AahaarDAO) {
+      showToast("Web3 Contracts not loaded. Please connect your wallet.", "error");
+      return;
+    }
+    if (!targetNgoAddr || !ethers.isAddress(targetNgoAddr)) {
+      showToast("Please enter a valid Polygon wallet address.", "error");
+      return;
+    }
+    if (!desc.trim()) {
+      showToast("Please provide a description or justification.", "error");
+      return;
+    }
+    setLoadingDao(true);
+    try {
+      showToast("Creating governance proposal... 🦊", "info");
+      const tx = await contracts.AahaarDAO.createProposal(targetNgoAddr, Number(pType), desc);
+      showToast("Confirming proposal transaction... ⏳", "info");
+      await tx.wait();
+      showToast("Governance proposal created successfully! 🗳️", "success");
+      fetchDaoProposals();
+    } catch (err) {
+      console.error("Error creating proposal:", err);
+      showToast(err.reason || err.message || "Failed to create proposal.", "error");
+    } finally {
+      setLoadingDao(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 'dao') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchDaoProposals();
+    }
+  }, [tab, fetchDaoProposals]);
+
   const handleVerifyPickup = async (donationId, token) => {
     setVerifying(true);
     try {
@@ -243,13 +386,30 @@ export default function NgoDashboard() {
   const handleVerifyRequestFulfillment = async (requestId, token) => {
     setVerifying(true);
     try {
+      if (isConnected && contracts?.Donation) {
+        try {
+          showToast("Verifying on Polygon blockchain... 🦊", "info");
+          const onChainDonationId = token && token.startsWith("TX-")
+            ? Number(token.replace("TX-", ""))
+            : 1;
+          
+          const tx = await contracts.Donation.verifyDonation(onChainDonationId);
+          showToast("Confirming transaction... ⏳", "info");
+          await tx.wait();
+          showToast("Verification confirmed on Polygon! Reputation rewarded. 🌟", "success");
+        } catch (blockchainErr) {
+          console.error("Blockchain verification failed:", blockchainErr);
+          showToast("Blockchain verification skipped or failed, proceeding with database verification. ⚠️", "warning");
+        }
+      }
+
       const url = requestId ? `/aahar/ngo-food-requests/${requestId}/verify-fulfillment` : `/aahar/ngo-food-requests/token-only/verify-fulfillment`;
       const res = await api.put(url, { token });
       showToast(res.data?.message || 'Fulfillment verified successfully!', 'success');
       setScannedData(res.data?.request || true);
       fetchData();
     } catch (err) {
-      showToast(err.response?.data?.message || 'Verification failed. Please check the token.', 'error');
+      showToast(err.response?.data?.message || err.message || 'Verification failed. Please check the token.', 'error');
     } finally {
       setVerifying(false);
     }
@@ -377,6 +537,22 @@ export default function NgoDashboard() {
 
     setSubmitting(true);
     try {
+      if (isConnected && contracts?.DonationRequest) {
+        try {
+          showToast("Initiating Polygon blockchain transaction... 🦊", "info");
+          const foodTypeString = foodItems.map(item => `${item.foodName} (${item.quantity}${item.quantityType})`).join(', ');
+          const totalQty = foodItems.reduce((sum, item) => sum + Number(item.quantity), 0);
+          
+          const tx = await contracts.DonationRequest.createRequest(foodTypeString, totalQty, form.city || ngo?.ngoCity || "Varanasi");
+          showToast("Confirming transaction... ⏳", "info");
+          await tx.wait();
+          showToast("Request recorded on-chain! 🎉", "success");
+        } catch (blockchainErr) {
+          console.error("Blockchain transaction failed:", blockchainErr);
+          showToast("Blockchain submission skipped or failed, proceeding with database submission. ⚠️", "warning");
+        }
+      }
+
       const payload = {
         ngoEmail: ngo?.ngoEmail,
         foodItemsNeeded: foodItems.map(item => ({
@@ -432,112 +608,213 @@ export default function NgoDashboard() {
   ];
 
   return (
-    <div className="dashboard-layout">
+    <div className="dashboard-layout" style={{ '--sidebar-w': sidebarCollapsed ? '78px' : '260px' }}>
       {/* Sidebar */}
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-sidebar__brand">
-          <span>🏢</span>
-          <span className="gradient-text" style={{ fontWeight: 800 }}>NGO Portal</span>
+      <aside className="dashboard-sidebar" style={{ padding: sidebarCollapsed ? '24px 10px' : '24px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: 16, marginBottom: 20 }}>
+          {!sidebarCollapsed ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '1.05rem', fontWeight: 800 }}>
+              <span>🏢</span>
+              <span className="gradient-text" style={{ fontWeight: 800 }}>NGO Portal</span>
+            </div>
+          ) : (
+            <span style={{ fontSize: '1.4rem' }}>🏢</span>
+          )}
+          <button 
+            onClick={toggleSidebar} 
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 6,
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              fontSize: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              marginLeft: sidebarCollapsed ? 0 : 8,
+              marginTop: sidebarCollapsed ? 8 : 0
+            }}
+            title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-orange)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+          >
+            {sidebarCollapsed ? '▶' : '◀'}
+          </button>
         </div>
 
-        <div className="dashboard-sidebar__nav-section-title">Navigation</div>
+        {!sidebarCollapsed && <div className="dashboard-sidebar__nav-section-title">Navigation</div>}
+        {sidebarCollapsed && <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '12px 0 8px' }} />}
         <nav className="dashboard-sidebar__nav">
           <button
             className={`dashboard-sidebar__nav-item ${tab === 'overview' ? 'dashboard-sidebar__nav-item--active' : ''}`}
             onClick={() => setTab('overview')}
+            style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }}
+            title={sidebarCollapsed ? "Overview" : undefined}
           >
-            <span>📊</span> Overview
+            {sidebarCollapsed ? (
+              <span style={{ fontSize: '1.2rem' }}>📊</span>
+            ) : (
+              <><span style={{ marginRight: 8 }}>📊</span> Overview</>
+            )}
           </button>
           {ngo?.isApproved && (
             <button
               className={`dashboard-sidebar__nav-item ${tab === 'request' ? 'dashboard-sidebar__nav-item--active' : ''}`}
               onClick={() => setTab('request')}
+              style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }}
+              title={sidebarCollapsed ? "Request Food" : undefined}
             >
-              <span>🥣</span> Request Food
+              {sidebarCollapsed ? (
+                <span style={{ fontSize: '1.2rem' }}>🥣</span>
+              ) : (
+                <><span style={{ marginRight: 8 }}>🥣</span> Request Food</>
+              )}
             </button>
           )}
           {ngo?.isApproved && (
             <button
               className={`dashboard-sidebar__nav-item ${tab === 'donations' ? 'dashboard-sidebar__nav-item--active' : ''}`}
               onClick={() => setTab('donations')}
+              style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }}
+              title={sidebarCollapsed ? "Direct Donations" : undefined}
             >
-              <span>🎁</span> Direct Donations
-              {assignedDonations.filter(d => {
-                const s = (d.status || '').replace(/_/g, '').toUpperCase();
-                return s === 'PENDINGNGOACCEPTANCE' || s === 'NGOACCEPTED' || s === 'APPROVED' || s === 'REQUESTACCEPTED';
-              }).length > 0 && tab !== 'donations' && (
-                <span style={{ marginLeft: 'auto', background: 'rgba(234,179,8,0.15)', color: '#fbbf24', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
+              {sidebarCollapsed ? (
+                <div style={{ position: 'relative', display: 'inline-flex', width: '100%', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '1.2rem' }}>🎁</span>
                   {assignedDonations.filter(d => {
                     const s = (d.status || '').replace(/_/g, '').toUpperCase();
                     return s === 'PENDINGNGOACCEPTANCE' || s === 'NGOACCEPTED' || s === 'APPROVED' || s === 'REQUESTACCEPTED';
-                  }).length}
-                </span>
+                  }).length > 0 && tab !== 'donations' && (
+                    <span style={{ position: 'absolute', top: -2, right: 12, background: '#fbbf24', width: 6, height: 6, borderRadius: '50%' }} />
+                  )}
+                </div>
+              ) : (
+                <>
+                  <span>🎁</span> Direct Donations
+                  {assignedDonations.filter(d => {
+                    const s = (d.status || '').replace(/_/g, '').toUpperCase();
+                    return s === 'PENDINGNGOACCEPTANCE' || s === 'NGOACCEPTED' || s === 'APPROVED' || s === 'REQUESTACCEPTED';
+                  }).length > 0 && tab !== 'donations' && (
+                    <span style={{ marginLeft: 'auto', background: 'rgba(234,179,8,0.15)', color: '#fbbf24', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
+                      {assignedDonations.filter(d => {
+                        const s = (d.status || '').replace(/_/g, '').toUpperCase();
+                        return s === 'PENDINGNGOACCEPTANCE' || s === 'NGOACCEPTED' || s === 'APPROVED' || s === 'REQUESTACCEPTED';
+                      }).length}
+                    </span>
+                  )}
+                </>
               )}
             </button>
           )}
           <button
             className={`dashboard-sidebar__nav-item ${tab === 'history' ? 'dashboard-sidebar__nav-item--active' : ''}`}
             onClick={() => setTab('history')}
+            style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }}
+            title={sidebarCollapsed ? "Request History" : undefined}
           >
-            <span>📜</span> Request History
-            {requests.length > 0 && tab !== 'history' && (
-              <span style={{ marginLeft: 'auto', background: 'rgba(249,115,22,0.15)', color: 'var(--color-orange)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
-                {requests.length}
-              </span>
+            {sidebarCollapsed ? (
+              <div style={{ position: 'relative', display: 'inline-flex', width: '100%', justifyContent: 'center' }}>
+                <span style={{ fontSize: '1.2rem' }}>📜</span>
+                {requests.length > 0 && tab !== 'history' && (
+                  <span style={{ position: 'absolute', top: -2, right: 12, background: 'var(--color-orange)', width: 6, height: 6, borderRadius: '50%' }} />
+                )}
+              </div>
+            ) : (
+              <>
+                <span>📜</span> Request History
+                {requests.length > 0 && tab !== 'history' && (
+                  <span style={{ marginLeft: 'auto', background: 'rgba(249,115,22,0.15)', color: 'var(--color-orange)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
+                    {requests.length}
+                  </span>
+                )}
+              </>
             )}
           </button>
-          <Link to="/dashboard" className="dashboard-sidebar__nav-item">
-            <span>📦</span> Donations
+          {ngo?.isApproved && (
+            <button
+              className={`dashboard-sidebar__nav-item ${tab === 'dao' ? 'dashboard-sidebar__nav-item--active' : ''}`}
+              onClick={() => setTab('dao')}
+              style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }}
+              title={sidebarCollapsed ? "DAO Governance" : undefined}
+            >
+              {sidebarCollapsed ? (
+                <span style={{ fontSize: '1.2rem' }}>🗳️</span>
+              ) : (
+                <><span style={{ marginRight: 8 }}>🗳️</span> DAO Governance</>
+              )}
+            </button>
+          )}
+          <Link to="/dashboard" className="dashboard-sidebar__nav-item" style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }} title={sidebarCollapsed ? "Donations" : undefined}>
+            {sidebarCollapsed ? (
+              <span style={{ fontSize: '1.2rem' }}>📦</span>
+            ) : (
+              <><span>📦</span> Donations</>
+            )}
           </Link>
-          <Link to="/" className="dashboard-sidebar__nav-item">
-            <span>🏠</span> Home
+          <Link to="/" className="dashboard-sidebar__nav-item" style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }} title={sidebarCollapsed ? "Home" : undefined}>
+            {sidebarCollapsed ? (
+              <span style={{ fontSize: '1.2rem' }}>🏠</span>
+            ) : (
+              <><span>🏠</span> Home</>
+            )}
           </Link>
         </nav>
 
-        <div className="dashboard-sidebar__nav-section-title" style={{ marginTop: 8 }}>NGO Status</div>
-        {loading ? (
-          <div style={{ padding: '12px 14px' }}>
-            <div className="skeleton" style={{ height: 60, borderRadius: 'var(--radius-md)' }} />
-          </div>
-        ) : ngo ? (
-          <div style={{ padding: '12px 14px', background: ngo.isApproved ? 'rgba(34,197,94,0.06)' : 'rgba(234,179,8,0.06)', borderRadius: 'var(--radius-md)', border: `1px solid ${ngo.isApproved ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)'}`, margin: '0 0 12px' }}>
-            <div style={{ fontWeight: 800, fontSize: '0.85rem', marginBottom: 4 }}>{ngo.ngoName}</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 6 }}>📍 {ngo.ngoCity}</div>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '3px 10px', borderRadius: 99, fontSize: '0.72rem', fontWeight: 700,
-              background: ngo.isApproved ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)',
-              color: ngo.isApproved ? '#4ade80' : '#fbbf24'
-            }}>
-              {ngo.isApproved ? '✅ Approved' : '⏳ Pending Approval'}
+        {!sidebarCollapsed && <div className="dashboard-sidebar__nav-section-title" style={{ marginTop: 8 }}>NGO Status</div>}
+        {!sidebarCollapsed && (
+          loading ? (
+            <div style={{ padding: '12px 14px' }}>
+              <div className="skeleton" style={{ height: 60, borderRadius: 'var(--radius-md)' }} />
             </div>
-          </div>
-        ) : (
-          <div style={{ padding: '10px 14px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            No NGO registered yet.
-            <br />
-            <Link to="/ngo-register" style={{ color: 'var(--color-orange)', fontWeight: 600, marginTop: 4, display: 'inline-block' }}>
-              → Register your NGO
-            </Link>
-          </div>
+          ) : ngo ? (
+            <div style={{ padding: '12px 14px', background: ngo.isApproved ? 'rgba(34,197,94,0.06)' : 'rgba(234,179,8,0.06)', borderRadius: 'var(--radius-md)', border: `1px solid ${ngo.isApproved ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)'}`, margin: '0 0 12px' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.85rem', marginBottom: 4 }}>{ngo.ngoName}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 6 }}>📍 {ngo.ngoCity}</div>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '3px 10px', borderRadius: 99, fontSize: '0.72rem', fontWeight: 700,
+                background: ngo.isApproved ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)',
+                color: ngo.isApproved ? '#4ade80' : '#fbbf24'
+              }}>
+                {ngo.isApproved ? '✅ Approved' : '⏳ Pending Approval'}
+              </div>
+            </div>
+          ) : (
+            <div style={{ padding: '10px 14px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              No NGO registered yet.
+              <br />
+              <Link to="/ngo-register" style={{ color: 'var(--color-orange)', fontWeight: 600, marginTop: 4, display: 'inline-block' }}>
+                → Register your NGO
+              </Link>
+            </div>
+          )
         )}
 
-        <div className="dashboard-sidebar__user">
-          <div className="dashboard-sidebar__avatar" style={{ background: 'var(--grad-teal)' }}>{avatarLetter}</div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.firstName} {user?.surname}
+        <div className="dashboard-sidebar__user" style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '16px 0 0' : '16px 8px 0' }}>
+          <div className="dashboard-sidebar__avatar" style={{ background: 'var(--grad-teal)' }} title={sidebarCollapsed ? `${user?.firstName} (NGO Rep)` : undefined}>{avatarLetter}</div>
+          {!sidebarCollapsed && (
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.firstName} {user?.surname}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-teal)' }}>NGO Representative</div>
+              <div style={{ fontSize: '0.72rem', color: '#fbbf24', marginTop: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
+                ⭐ Reputation: {reputation} pts
+              </div>
             </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--color-teal)' }}>NGO Representative</div>
-          </div>
+          )}
         </div>
         <button
           onClick={handleLogout}
-          style={{ width: '100%', marginTop: 10, padding: '10px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--radius-md)', color: 'var(--color-red)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s' }}
+          style={{ width: '100%', marginTop: 10, padding: sidebarCollapsed ? '10px 0' : '10px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--radius-md)', color: 'var(--color-red)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', gap: sidebarCollapsed ? 0 : 8, transition: 'all 0.2s' }}
+          title={sidebarCollapsed ? "Logout" : undefined}
           onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.12)'}
           onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.06)'}
         >
-          🚪 Logout
+          <span>🚪</span> {!sidebarCollapsed && 'Logout'}
         </button>
       </aside>
 
@@ -1228,6 +1505,234 @@ export default function NgoDashboard() {
             </div>
           );
         })()}
+
+        {/* ─── DAO GOVERNANCE ─── */}
+        {tab === 'dao' && (
+          <div style={{ animation: 'fadeInUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* DAO Governance Banner */}
+            <div className="glass-card" style={{ padding: '24px 28px', borderLeft: '4px solid var(--color-purple)' }}>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '2rem' }}>🗳️</span>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: 6, color: 'var(--text-primary)' }}>AAHAAR DAO Governance Portal</h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    Decentralized trust and verification are at the core of AAHAAR. Verified NGOs govern the onboarding of new organizations and help weed out bad actors through proposal-based voting. Cast your vote or create new onboarding/removal proposals.
+                  </p>
+                  <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <span>🗳️ <strong>Voting Quorum:</strong> Majority vote (requires 3+ votes to execute early)</span>
+                    <span>⏳ <strong>Voting Duration:</strong> 3 Days</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Wallet Integration Status */}
+            <div className="glass-card" style={{ padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.5, marginBottom: 4 }}>Web3 Identity Status</div>
+                {isConnected ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600, fontFamily: 'monospace' }}>Connected: {walletAddress}</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-red)', display: 'inline-block' }} />
+                    <span style={{ fontSize: '0.88rem', color: 'var(--color-red)', fontWeight: 600 }}>Wallet Disconnected</span>
+                  </div>
+                )}
+              </div>
+              {!isConnected && (
+                <button className="btn-primary" style={{ background: 'var(--grad-purple)', padding: '8px 18px', fontSize: '0.82rem' }} onClick={() => connectWallet()}>
+                  🦊 Connect MetaMask
+                </button>
+              )}
+            </div>
+
+            {/* Create Proposal Section */}
+            {ngo?.isApproved && (
+              <div className="glass-card" style={{ padding: 24 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  ➕ Create Governance Proposal
+                </h3>
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const target = e.target.targetNGO.value;
+                  const type = e.target.proposalType.value;
+                  const desc = e.target.description.value;
+                  await handleCreateDaoProposal(target, type, desc);
+                  e.target.reset();
+                }} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Target NGO Wallet Address</label>
+                      <input 
+                        name="targetNGO"
+                        className="form-input"
+                        placeholder="0x..."
+                        required
+                        style={{ fontSize: '0.85rem' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Proposal Type</label>
+                      <select name="proposalType" className="form-input" style={{ fontSize: '0.85rem' }}>
+                        <option value="0">Onboard (Verify NGO)</option>
+                        <option value="1">Remove (Flag/Reject NGO)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Justification / Description</label>
+                    <textarea 
+                      name="description"
+                      className="form-input"
+                      placeholder="Explain why this NGO should be onboarded or removed from the platform..."
+                      required
+                      rows={3}
+                      style={{ fontSize: '0.85rem', resize: 'vertical' }}
+                    />
+                  </div>
+                  <button 
+                    type="submit" 
+                    className="btn-primary" 
+                    style={{ background: 'var(--grad-purple)', padding: '10px 24px', fontSize: '0.85rem', alignSelf: 'flex-start' }}
+                    disabled={loadingDao}
+                  >
+                    Submit Proposal to DAO
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Active Proposals List */}
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                📋 Governance Proposals ({daoProposals.length})
+              </h3>
+              {loadingDao ? (
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>
+                  <div className="spinner spinner-lg" style={{ marginBottom: 12 }} />
+                  <div>Fetching DAO proposals from blockchain...</div>
+                </div>
+              ) : daoProposals.length === 0 ? (
+                <div className="glass-card" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  🗳️ No proposals found.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {daoProposals.map((prop) => {
+                    const isVotingClosed = new Date() > prop.deadline;
+                    const canExecute = !prop.executed && (isVotingClosed || (prop.votesFor > 2 && prop.votesFor > prop.votesAgainst));
+                    
+                    return (
+                      <div key={prop.id} className="glass-card" style={{ padding: 20, borderLeft: `4px solid ${prop.executed ? '#4ade80' : isVotingClosed ? 'var(--color-yellow)' : 'var(--color-purple)'}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace' }}>
+                                PROPOSAL #{prop.id}
+                              </span>
+                              <span style={{
+                                padding: '2px 8px', borderRadius: 99, fontSize: '0.68rem', fontWeight: 800,
+                                background: prop.proposalType === 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: prop.proposalType === 0 ? '#4ade80' : '#f87171'
+                              }}>
+                                {prop.proposalType === 0 ? '📥 ONBOARD' : '🚫 REMOVE'}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              Target NGO: <span style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{prop.targetNGO}</span>
+                            </div>
+                          </div>
+                          <div>
+                            {prop.executed ? (
+                              <span className="badge badge-approved" style={{ fontSize: '0.7rem' }}>Executed</span>
+                            ) : isVotingClosed ? (
+                              <span className="badge badge-pending" style={{ fontSize: '0.7rem' }}>Voting Closed</span>
+                            ) : (
+                              <span className="badge badge-inreview" style={{ fontSize: '0.7rem' }}>Voting Active</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.4 }}>
+                          {prop.description}
+                        </p>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                          {/* Votes counter */}
+                          <div style={{ flex: 1, minWidth: 200 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 700, marginBottom: 6 }}>
+                              <span style={{ color: '#4ade80' }}>👍 {prop.votesFor} For</span>
+                              <span style={{ color: '#f87171' }}>👎 {prop.votesAgainst} Against</span>
+                            </div>
+                            {/* Simple visual progress bar */}
+                            <div style={{ height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden', display: 'flex' }}>
+                              {prop.votesFor + prop.votesAgainst > 0 ? (
+                                <>
+                                  <div style={{ width: `${(prop.votesFor / (prop.votesFor + prop.votesAgainst)) * 100}%`, background: 'var(--grad-green)' }} />
+                                  <div style={{ width: `${(prop.votesAgainst / (prop.votesFor + prop.votesAgainst)) * 100}%`, background: 'var(--grad-red)' }} />
+                                </>
+                              ) : (
+                                <div style={{ width: '100%', background: 'rgba(255,255,255,0.05)' }} />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Voting Deadline */}
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            ⏳ Deadline: <strong>{prop.deadline.toLocaleDateString('en-IN')} {prop.deadline.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</strong>
+                          </div>
+
+                          {/* Vote Actions */}
+                          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                            {!prop.executed && !isVotingClosed && isConnected && (
+                              prop.userHasVoted ? (
+                                <span style={{ fontSize: '0.78rem', color: 'var(--color-teal)', fontWeight: 700 }}>✓ Voted</span>
+                              ) : (
+                                <>
+                                  <button 
+                                    className="btn-primary" 
+                                    style={{ background: 'var(--grad-green)', border: 'none', padding: '6px 14px', fontSize: '0.75rem' }}
+                                    onClick={() => handleVoteDaoProposal(prop.id, true)}
+                                    disabled={loadingDao}
+                                  >
+                                    👍 For
+                                  </button>
+                                  <button 
+                                    className="btn-primary" 
+                                    style={{ background: 'var(--grad-red)', border: 'none', padding: '6px 14px', fontSize: '0.75rem' }}
+                                    onClick={() => handleVoteDaoProposal(prop.id, false)}
+                                    disabled={loadingDao}
+                                  >
+                                    👎 Against
+                                  </button>
+                                </>
+                              )
+                            )}
+
+                            {/* Execution trigger */}
+                            {canExecute && (
+                              <button 
+                                className="btn-primary" 
+                                style={{ background: 'var(--grad-purple)', border: 'none', padding: '6px 14px', fontSize: '0.75rem' }}
+                                onClick={() => handleExecuteDaoProposal(prop.id)}
+                                disabled={loadingDao}
+                              >
+                                ⚡ Execute Proposal
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Verify Pickup Scanner Modal */}

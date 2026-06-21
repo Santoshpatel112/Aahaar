@@ -65,6 +65,10 @@ const ngoSchema = mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    walletAddress: {
+        type: String,
+        default: null,
+    },
     approvedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

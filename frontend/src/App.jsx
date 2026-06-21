@@ -21,6 +21,8 @@ import NgoDashboard from './pages/NgoDashboard';
 import StatsPage from './pages/StatsPage';
 import AboutPage from './pages/AboutPage';
 import NotificationsPage from './pages/NotificationsPage';
+import BlockchainExplorer from './pages/BlockchainExplorer';
+import TransparencyPage from './pages/TransparencyPage';
 
 import { connectSocket, disconnectSocket } from './services/socket';
 import { requestFcmPermission } from './services/firebase';
@@ -85,7 +87,12 @@ function AppRoutes() {
         .unwrap()
         .then((notifications) => {
           const unread = (notifications || []).filter(n => !n.isRead);
-          if (unread.length > 0) unread.forEach(n => showToast(`🔔 ${n.title}: ${n.message}`, 'info'));
+          // Only toast notifications that are fresh (created within the last 60 seconds)
+          const now = Date.now();
+          const freshUnread = unread.filter(n => (now - new Date(n.createdAt).getTime()) < 60000);
+          if (freshUnread.length > 0) {
+            freshUnread.forEach(n => showToast(`🔔 ${n.title}: ${n.message}`, 'info'));
+          }
         })
         .catch((err) => {
           console.error('Failed to load notifications on login:', err);
@@ -190,6 +197,8 @@ function AppRoutes() {
         <Route path="/ngo-register" element={<NgoRegistration />} />
         <Route path="/stats" element={<StatsPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/transparency" element={<TransparencyPage />} />
+        <Route path="/explorer" element={<BlockchainExplorer />} />
 
         <Route
           path="/dashboard"
@@ -242,11 +251,15 @@ function AppRoutes() {
   );
 }
 
+import { WalletProvider } from './context/WalletContext';
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <WalletProvider>
+          <AppRoutes />
+        </WalletProvider>
       </AuthProvider>
     </BrowserRouter>
   );

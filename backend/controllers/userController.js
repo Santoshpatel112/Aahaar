@@ -1,4 +1,5 @@
 import User from "../models/userModel.js";
+import { ethers } from "ethers";
 import generateToken from "../utils/token.js";
 import asyncHandler from "../middlewares/asyncHandler.js";
 import { getFileUrl } from "../s3Config.js";
@@ -248,9 +249,59 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     isAdmin: updatedUser.isAdmin,
     adharVerificationDocument: updatedUser.adharVerificationDocument,
     profileImage: updatedUser.profileImage,
+    walletAddress: updatedUser.walletAddress,
     message: "Profile updated successfully"
   });
 });
 
-export { authUser, registerUser, logoutUser, uploadAdharDocument, updateUserProfile, getUserProfile };
+// Link user wallet with cryptographic signature verification
+const linkUserWallet = asyncHandler(async (req, res) => {
+  const { walletAddress, signature } = req.body;
+
+  if (!walletAddress || !signature) {
+    res.status(400);
+    throw new Error("Wallet address and signature are required.");
+  }
+
+  // Verify the signature
+  const message = `Sign this message to link your wallet to AAHAAR: ${req.user._id}`;
+  let recoveredAddress;
+  try {
+    recoveredAddress = ethers.verifyMessage(message, signature);
+  } catch (error) {
+    res.status(400);
+    throw new Error("Invalid signature formatting: " + error.message);
+  }
+
+  if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+    res.status(400);
+    throw new Error("Signature verification failed. Address mismatch.");
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  user.walletAddress = walletAddress.toLowerCase();
+  await user.save();
+
+  // Dynamically import Ngo model to avoid circular issues
+  const Ngo = (await import("../models/ngoModel.js")).default;
+  const ngo = await Ngo.findOne({ registeredBy: req.user._id });
+  if (ngo) {
+    ngo.walletAddress = walletAddress.toLowerCase();
+    await ngo.save();
+    console.log(`✅ Wallet Address auto-linked to NGO ${ngo.ngoName}`);
+  }
+
+  res.status(200).json({
+    message: "Wallet linked successfully! 🔒",
+    walletAddress: user.walletAddress
+  });
+});
+
+export { authUser, registerUser, logoutUser, uploadAdharDocument, updateUserProfile, getUserProfile, linkUserWallet };
+
 

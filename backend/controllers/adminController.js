@@ -666,38 +666,113 @@ const fulfillNgoFoodRequest = asyncHandler(async (req, res) => {
   const { adminNotes } = req.body;
   const request = await NgoFoodRequest.findById(id);
   if (!request) { res.status(404); throw new Error('Request not found'); }
-  if (request.status !== 'approved') { res.status(400); throw new Error('Request must be approved before fulfillment'); }
-  request.status = 'fulfilled';
-  request.fulfilledAt = new Date();
-  if (adminNotes) request.adminNotes = adminNotes;
-  await request.save();
+  
+  if (request.status === 'approved') {
+    // Stage 1: Accept & start fulfillment (generate verification token & QR)
+    if (!request.verificationToken) {
+      const generateUniqueRequestToken = async () => {
+        let token;
+        let exists = true;
+        while (exists) {
+          token = Math.floor(100000 + Math.random() * 900000).toString();
+          const found = await NgoFoodRequest.findOne({ verificationToken: token });
+          if (!found) exists = false;
+        }
+        return token;
+      };
+      request.verificationToken = await generateUniqueRequestToken();
+    }
+    const token = request.verificationToken;
+    request.status = 'REQUEST_ACCEPTED';
+    request.acceptedBy = req.user._id;
+    request.acceptedAt = new Date();
+    request.expectedDeliveryDate = new Date();
+    if (adminNotes) request.adminNotes = adminNotes;
+    await request.save();
+    
+    // Create corresponding FoodInfo donation to represent this admin-fulfillment
+    const foodItemDetails = (request.foodItemsNeeded || []).map(item => ({
+      foodName: item.foodName,
+      quantity: item.quantity,
+      quantityType: item.quantityType,
+      expiryDate: new Date(),
+      donorId: req.user._id,
+      category: item.category
+    }));
 
-  if (request.requestedBy) {
-    await notify({
-      receiverId: request.requestedBy,
-      receiverRole: 'ngo',
-      title: 'NGO Food Request Fulfilled',
-      message: 'Your NGO food request has been marked as fulfilled by Admin.',
-      type: 'FOOD_REQUEST_FULFILLED',
-      entityType: 'NgoFoodRequest',
-      entityId: request._id,
-      priority: 'medium'
-    });
-  }
-  if (request.acceptedBy) {
-    await notify({
-      receiverId: request.acceptedBy,
-      receiverRole: 'donor',
-      title: 'Fulfillment Completed',
-      message: 'The food request you accepted has been marked as fulfilled by Admin.',
-      type: 'FOOD_REQUEST_FULFILLED',
-      entityType: 'NgoFoodRequest',
-      entityId: request._id,
-      priority: 'medium'
-    });
-  }
+    const contactDetails = {
+      fullAddress: req.user.city + ", " + req.user.state + ", " + req.user.country,
+      city: req.user.city || request.contactDetails?.city || "City",
+      contactPersonName: `${req.user.firstName} ${req.user.surname}`.trim(),
+      phoneNumber: req.user.phone || "N/A",
+      email: req.user.email || "N/A"
+    };
 
-  res.status(200).json({ message: 'NGO food request marked as fulfilled', request });
+    let donation = await FoodInfo.findOne({ verificationToken: token });
+    if (!donation) {
+      await FoodInfo.create({
+        foodItemDetails,
+        contactDetails,
+        ngoPreference: request.ngoId?._id || request.ngoId,
+        verificationToken: token,
+        status: 'REQUEST_ACCEPTED',
+        isApproved: true,
+        approvedBy: req.user._id,
+        approvedAt: new Date()
+      });
+    }
+
+    res.status(200).json({ 
+      message: `Fulfillment initiated. Please provide the Verification Code (${token}) or QR Code to the NGO.`, 
+      request 
+    });
+  } else if (request.status === 'REQUEST_ACCEPTED') {
+    // Stage 2: Force fulfill / Mark completed directly (bypassing QR verification if failed)
+    request.status = 'fulfilled';
+    request.fulfilledAt = new Date();
+    if (adminNotes) request.adminNotes = adminNotes;
+    await request.save();
+
+    // Mark corresponding FoodInfo donation as COMPLETED
+    if (request.verificationToken) {
+      const donation = await FoodInfo.findOne({ verificationToken: request.verificationToken.toUpperCase() });
+      if (donation && donation.status !== 'done' && donation.status !== 'COMPLETED') {
+        donation.status = 'COMPLETED';
+        donation.completedAt = new Date();
+        await donation.save();
+      }
+    }
+
+    if (request.requestedBy) {
+      await notify({
+        receiverId: request.requestedBy,
+        receiverRole: 'ngo',
+        title: 'NGO Food Request Fulfilled',
+        message: 'Your NGO food request has been marked as fulfilled by Admin.',
+        type: 'FOOD_REQUEST_FULFILLED',
+        entityType: 'NgoFoodRequest',
+        entityId: request._id,
+        priority: 'medium'
+      });
+    }
+    if (request.acceptedBy && request.acceptedBy.toString() !== req.user._id.toString()) {
+      await notify({
+        receiverId: request.acceptedBy,
+        receiverRole: 'donor',
+        title: 'Fulfillment Completed',
+        message: 'The food request you accepted has been marked as fulfilled by Admin.',
+        type: 'FOOD_REQUEST_FULFILLED',
+        entityType: 'NgoFoodRequest',
+        entityId: request._id,
+        priority: 'medium'
+      });
+    }
+
+    res.status(200).json({ message: 'NGO food request marked as fulfilled', request });
+  } else {
+    res.status(400);
+    throw new Error('Request must be approved or accepted before fulfillment');
+  }
 });
 
 // @desc    Toggle admin review flag for NGO food request
@@ -712,24 +787,58 @@ const toggleNgoRequestReview = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Review status toggled', request });
 });
 
-// Search by token (admin) - returns matching FoodInfo and NgoFoodRequest with populated details
 const searchByToken = asyncHandler(async (req, res) => {
   const { token } = req.params;
   if (!token) {
     res.status(400);
     throw new Error('Token is required');
   }
-  const tokenUpper = token.trim().toUpperCase();
+  const cleanToken = token.trim().replace(/^#/, '');
+  const cleanTokenLower = cleanToken.toLowerCase();
 
-  const donation = await FoodInfo.findOne({ verificationToken: tokenUpper })
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(cleanToken);
+
+  let searchConditions = [
+    { verificationToken: { $regex: new RegExp("^" + cleanToken + "$", "i") } }
+  ];
+
+  if (isObjectId) {
+    searchConditions.push({ _id: cleanToken });
+  } else if (cleanToken.length > 0) {
+    searchConditions.push({
+      $expr: {
+        $regexMatch: {
+          input: { $toString: "$_id" },
+          regex: cleanTokenLower
+        }
+      }
+    });
+  }
+
+  const query = { $or: searchConditions };
+
+  let donation = await FoodInfo.findOne(query)
     .populate({ path: 'foodItemDetails.donorId', select: 'firstName surname email phone city isVerified' })
     .populate({ path: 'pickedUpByNgo', select: 'ngoName ngoEmail ngoPhone ngoCity isApproved' })
+    .populate({ path: 'approvedBy', select: 'firstName surname email' })
+    .populate({ path: 'rejectedBy', select: 'firstName surname email' })
     .lean();
 
-  const request = await NgoFoodRequest.findOne({ verificationToken: tokenUpper })
+  if (donation && donation.ngoPreference && donation.ngoPreference !== 'random') {
+    const ngo = await Ngo.findById(donation.ngoPreference)
+      .select('ngoName ngoEmail ngoPhone ngoCity ngoState ngoAddress isApproved')
+      .lean();
+    if (ngo) {
+      donation.ngoPreference = ngo;
+    }
+  }
+
+  const request = await NgoFoodRequest.findOne(query)
     .populate('ngoId', 'ngoName ngoEmail ngoPhone ngoCity ngoState isApproved')
     .populate('requestedBy', 'firstName surname email')
     .populate('acceptedBy', 'firstName surname email phone')
+    .populate('approvedBy', 'firstName surname')
+    .populate('rejectedBy', 'firstName surname')
     .lean();
 
   return res.status(200).json({ donation, request, message: 'Search results' });

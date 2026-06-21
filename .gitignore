@@ -1,0 +1,13 @@
+# Dependencies
+hardhat/node_modules/
+node_modules/
+
+# Hardhat compilation files
+hardhat/artifacts/
+hardhat/cache/
+
+# Local env files
+.env
+hardhat/.env
+backend/.env
+frontend/.env
