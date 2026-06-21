@@ -63,14 +63,56 @@ The platform features a hybrid real-time alert and background push notification 
 
 ---
 
-## 🧾 Section 80G Tax Exemption
+## 🏢 Corporate CSR & ESG Impact Portal
+
+Aahaar provides corporate donors with a high-fidelity **Corporate Social Responsibility (CSR)** dashboard that enables real-time monitoring and reporting of social and environmental impact. This showcase is directly integrated into the landing page to demonstrate the system's capabilities:
+
+1. **Contributions Ledger (Audit Trail)**: Previews a comprehensive ledger of all corporate donations, linking each drop-off to its corresponding timestamp, weight in kilograms, recipient NGO, transaction status, and on-chain transaction hash.
+2. **Environmental & Carbon Offset Panel**: Tracks live greenhouse gas reduction metrics, meals distributed, and tree equivalents.
+3. **80G Tax Exemption Portal**: Provides downloadable, pre-populated Section 80G trust certificates with explicit valuation parameters.
+4. **Visual Analytics Suite**: Displays responsive progress gauges and categorizes distributions (Cooked Meals, Grains, Vegetables, Packaged Items) using modern CSS indicators.
+
+---
+
+## 🌱 Environment & Sustainability Mechanics
+
+Aahaar converts raw food rescue statistics into actionable environmental ESG (Environmental, Social, and Governance) metrics using scientifically-backed formulas:
+
+### 1. Landfill Methane Avoidance (Methane Offset Factor: 2.5)
+When surplus food is dumped in landfills, anaerobic decomposition generates highly potent methane gas (which has a global warming potential 25x greater than CO₂). Aahaar uses a standard **landfill diversion multiplier of 2.5 kg CO₂ offset per kg of food saved** to model prevented landfill decay emissions.
+$$\text{Carbon Reduction (kg CO₂)} = \text{Food Rescued (kg)} \times 2.5$$
+
+### 2. Atmospheric Carbon Sequestration (Tree Equivalent Factor: 22)
+To make the carbon reduction metrics intuitive for corporate stakeholders, the platform calculates the equivalent number of mature trees required to absorb that amount of carbon in a single year. This uses the standard EPA absorption rate of **22 kg CO₂ absorbed per tree per year**:
+$$\text{Trees Planted Equivalent} = \frac{\text{Carbon Reduction (kg CO₂)}}{22}$$
+
+### 3. Food-to-Meal Conversion Index (Multiplier: 2)
+To represent the direct social impact of feeding hungry communities, weight is translated into standard meal portions. Using national nutritional guidelines, 1 kg of saved food is equivalent to **2 nutritious meals**:
+$$\text{Meals Distributed} = \text{Food Rescued (kg)} \times 2$$
+
+---
+
+## 🧾 Section 80G Tax Exemption & Valuation Engine
 
 Aahaar simplifies social responsibility by offering tangible tax savings to verified donors under Section 80G.
 
 ![One Platform Double the Value](images/tax_benefits.png)
 
-* **Dynamic Exemption Calculation**: Automatically computes deduction indexes (up to 40%) based on food categories, quantity, and audited commercial values.
-* **Automated Certificate Generation**: Issues itemized, audit-ready PDF tax benefit certificates directly to the donor's profile upon successful delivery confirmation by the receiving NGO.
+### 1. Standardized Food Tax Valuation Index (₹45.00/kg)
+To prevent speculative valuations and ensure audit consistency, Aahaar implements a standardized valuation rate of **₹45.00 per kg** for rescued food. The tax exemption amount is computed as:
+$$\text{Tax Exemption Value (₹)} = \text{Food Rescued (kg)} \times 45.00$$
+
+### 2. Audit Reference System
+Every certificate is issued with a unique, audit-ready reference code (e.g., `AH-80G-[Transactions]-[Kilograms]`) that directly links the tax deduction to the underlying verified transactions. For example, `AH-80G-17-2625` indicates 17 successfully verified transactions representing 2,625 kg of rescued food, verifying the exact audit trail.
+
+---
+
+## 🛡️ Two-Stage Verification & Decentralized Sync
+
+To prevent fraudulent claims, the platform implements a strict two-stage verification handshake:
+1. **Stage 1 (Admin Acceptance)**: When an administrator accepts the NGO's claim, a secure 6-digit verification code and a corresponding QR code containing a JSON payload with the unique tracking `token` are generated.
+2. **Stage 2 (NGO Pickup & On-Chain Sync)**: Once the food is physically verified, scanning the QR code or entering the token updates the status to `COMPLETED` on the backend and triggers reputation updates on the blockchain. If the digital verification fails, the administrator can perform a secure off-chain bypass to force-mark the request as completed, ensuring operational robustness.
+
 
 ---
 
