@@ -1053,7 +1053,7 @@ export default function LandingPage() {
               </div>
               <p className="footer__tagline">
                 Fighting hunger, sharing hope. One meal at a time.<br />
-                A platform by the SSS Initiative 2025.
+                A platform by the Santosh Patel
               </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                 {['🌐', '📧', '📱'].map((icon, i) => (
@@ -1072,13 +1072,13 @@ export default function LandingPage() {
             </div>
             <div className="footer__links-group">
               <h4>Contact</h4>
-              <a href="mailto:sss.initiative.2025@gmail.com">sss.initiative.2025@gmail.com</a>
+              <a href="mailto:santoshpatelvns5@gmail.com">santoshpatelvns5@gmail.com</a>
               <span style={{ color: 'var(--text-secondary)' }}>Made in India 🇮🇳</span>
               <span style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Available Mon–Fri, 9AM–6PM</span>
             </div>
           </div>
           <div className="footer__bottom">
-            <span>© 2025 Aahaar · SSS Initiative. All rights reserved.</span>
+            <span>© 2025 Aahaar · Santosh Patel. All rights reserved.</span>
             <span>Made with ❤️ to fight hunger in India</span>
           </div>
         </div>

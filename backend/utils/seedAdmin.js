@@ -37,9 +37,9 @@ const seedAdmin = async () => {
     const adminUser = {
       firstName: 'sss',
       surname: 'sss',
-      email: 'sss.initiative.2025@gmail.com',
-      password: 'sss@2025', // This will be hashed by the pre-save hook
-      age: 30,
+      email: 'santoshpatelvns5@gmail.com',
+      password: 'Santosh8090#', // This will be hashed by the pre-save hook
+      age: 20,
       city: 'Delhi',
       state: 'Delhi',
       country: 'India',

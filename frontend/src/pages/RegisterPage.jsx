@@ -1,24 +1,150 @@
-import { useState, Fragment } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, Fragment, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { showToast } from '../components/Toast';
 import LocationSelectFields from '../components/LocationSelectFields';
 
 const STEPS = ['Account Info', 'Personal Details', 'Location', 'Identity Verification'];
 
-export default function RegisterPage() {
-  const { register, uploadAadhaar } = useAuth();
-  const navigate = useNavigate();
+const loadGoogleScript = () => {
+  return new Promise((resolve) => {
+    if (window.google) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve(true);
+    document.body.appendChild(script);
+  });
+};
 
-  const [step, setStep] = useState(0);
+export default function RegisterPage() {
+  const { register, googleLogin, sendOTP, verifyOTP, uploadAadhaar } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const googleUser = location?.state?.googleUser || null;
+  const [isGoogleReg, setIsGoogleReg] = useState(!!googleUser);
+  const [step, setStep] = useState(googleUser ? 1 : 0);
+
   const [form, setForm] = useState({
-    firstName: '', surname: '', email: '', password: '', confirmPassword: '',
-    age: '', phone: '', city: '', state: '', stateCode: '', country: 'India',
+    firstName: googleUser?.firstName || '',
+    surname: googleUser?.surname || '',
+    email: googleUser?.email || '',
+    password: '',
+    confirmPassword: '',
+    age: '',
+    phone: '',
+    city: '',
+    state: '',
+    stateCode: '',
+    country: 'India',
   });
   const [errors, setErrors] = useState({});
   const [showPass, setShowPass] = useState(false);
   const [aadhaarFile, setAadhaarFile] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const [otpCode, setOtpCode] = useState('');
+  const [showOtpInput, setShowOtpInput] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+
+  const handleGoogleResponse = async (response) => {
+    setErrors({});
+    const res = await googleLogin(response.credential);
+    if (res.success) {
+      if (res.data.exists) {
+        showToast(`Welcome back, ${res.data.user.firstName}! 🎉`, 'success');
+        navigate('/dashboard');
+      } else {
+        showToast(`Welcome! Please complete your registration details.`, 'info');
+        setForm((f) => ({
+          ...f,
+          email: res.data.user.email,
+          firstName: res.data.user.firstName,
+          surname: res.data.user.surname,
+        }));
+        setIsGoogleReg(true);
+        setStep(1);
+      }
+    } else {
+      showToast(res.error || 'Google Authentication failed', 'error');
+      setErrors({ submit: res.error });
+    }
+  };
+
+  useEffect(() => {
+    if (step === 0 && !isGoogleReg) {
+      let active = true;
+      loadGoogleScript().then(() => {
+        if (!active) return;
+        if (window.google) {
+          window.google.accounts.id.initialize({
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+            callback: handleGoogleResponse,
+          });
+          window.google.accounts.id.renderButton(
+            document.getElementById('google-register-btn'),
+            { theme: 'outline', size: 'large', width: '100%' }
+          );
+        }
+      });
+      return () => {
+        active = false;
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, isGoogleReg]);
+
+  const handleSendOTP = async () => {
+    const errs = {};
+    if (!form.email.trim()) errs.email = 'Required';
+    else if (!/\S+@\S+\.\S+/.test(form.email)) errs.email = 'Invalid email';
+    if (!form.password) errs.password = 'Required';
+    else if (form.password.length < 6) errs.password = 'Min 6 characters';
+    if (form.password !== form.confirmPassword) errs.confirmPassword = 'Passwords do not match';
+
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
+
+    setOtpLoading(true);
+    setErrors({});
+    const res = await sendOTP(form.email.trim().toLowerCase());
+    setOtpLoading(false);
+
+    if (res.success) {
+      setShowOtpInput(true);
+      showToast('Verification OTP code sent to your email.', 'success');
+    } else {
+      showToast(res.error || 'Failed to send OTP code', 'error');
+      setErrors({ email: res.error });
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otpCode) {
+      setErrors({ otp: 'Required' });
+      return;
+    }
+
+    setOtpLoading(true);
+    setErrors({});
+    const res = await verifyOTP(form.email.trim().toLowerCase(), otpCode);
+    setOtpLoading(false);
+
+    if (res.success) {
+      showToast('Email verified successfully! 🎉', 'success');
+      setStep(1);
+    } else {
+      showToast(res.error || 'OTP verification failed', 'error');
+      setErrors({ otp: res.error || 'Invalid OTP' });
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -66,7 +192,7 @@ export default function RegisterPage() {
       firstName: form.firstName,
       surname: form.surname,
       email: form.email.trim().toLowerCase(),
-      password: form.password,
+      password: isGoogleReg ? (form.password || Math.random().toString(36).slice(-10) + 'A1!') : form.password,
       age: Number(form.age),
       phone: form.phone,
       city: form.city,
@@ -92,7 +218,7 @@ export default function RegisterPage() {
       firstName: form.firstName,
       surname: form.surname,
       email: form.email.trim().toLowerCase(),
-      password: form.password,
+      password: isGoogleReg ? (form.password || Math.random().toString(36).slice(-10) + 'A1!') : form.password,
       age: Number(form.age),
       phone: form.phone,
       city: form.city,
@@ -189,7 +315,7 @@ export default function RegisterPage() {
               <div className="form-group">
                 <label className="form-label">Email Address</label>
                 <input name="email" type="email" className={`form-input ${errors.email ? 'error' : ''}`}
-                  placeholder="you@example.com" value={form.email} onChange={handleChange} autoComplete="email" />
+                  placeholder="you@example.com" value={form.email} onChange={handleChange} autoComplete="email" disabled={showOtpInput} />
                 {errors.email && <span className="form-error">⚠ {errors.email}</span>}
               </div>
               <div className="form-group">
@@ -197,8 +323,8 @@ export default function RegisterPage() {
                 <div style={{ position: 'relative' }}>
                   <input name="password" type={showPass ? 'text' : 'password'}
                     className={`form-input ${errors.password ? 'error' : ''}`}
-                    placeholder="Min 6 characters" value={form.password} onChange={handleChange} style={{ paddingRight: 44 }} />
-                  <button type="button" onClick={() => setShowPass(!showPass)}
+                    placeholder="Min 6 characters" value={form.password} onChange={handleChange} style={{ paddingRight: 44 }} disabled={showOtpInput} />
+                  <button type="button" onClick={() => setShowPass(!showPass)} disabled={showOtpInput}
                     style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem' }}>
                     {showPass ? '🙈' : '👁'}
                   </button>
@@ -219,12 +345,52 @@ export default function RegisterPage() {
                 <label className="form-label">Confirm Password</label>
                 <input name="confirmPassword" type="password"
                   className={`form-input ${errors.confirmPassword ? 'error' : ''}`}
-                  placeholder="Re-enter password" value={form.confirmPassword} onChange={handleChange} />
+                  placeholder="Re-enter password" value={form.confirmPassword} onChange={handleChange} disabled={showOtpInput} />
                 {errors.confirmPassword && <span className="form-error">⚠ {errors.confirmPassword}</span>}
               </div>
-              <button type="button" onClick={nextStep} className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '13px', marginTop: 4 }}>
-                Continue →
-              </button>
+
+              {showOtpInput && (
+                <div className="form-group" style={{ animation: 'fadeInUp 0.3s ease', marginTop: 12 }}>
+                  <label className="form-label">Verification OTP Code (Sent to your email)</label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    className={`form-input ${errors.otp ? 'error' : ''}`}
+                    placeholder="Enter 6-digit OTP"
+                    value={otpCode}
+                    onChange={(e) => {
+                      setOtpCode(e.target.value.trim());
+                      if (errors.otp) setErrors(prev => ({ ...prev, otp: '' }));
+                    }}
+                  />
+                  {errors.otp && <span className="form-error">⚠ {errors.otp}</span>}
+                </div>
+              )}
+
+              {showOtpInput ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+                  <button type="button" onClick={handleVerifyOTP} className="btn-primary" disabled={otpLoading} style={{ width: '100%', justifyContent: 'center', padding: '13px' }}>
+                    {otpLoading ? <><span className="spinner" /> Verifying...</> : 'Verify Code & Continue →'}
+                  </button>
+                  <button type="button" onClick={handleSendOTP} className="btn-ghost" disabled={otpLoading} style={{ width: '100%', justifyContent: 'center', padding: '13px' }}>
+                    {otpLoading ? 'Sending...' : 'Resend Email Code'}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button type="button" onClick={handleSendOTP} className="btn-primary" disabled={otpLoading} style={{ width: '100%', justifyContent: 'center', padding: '13px', marginTop: 4 }}>
+                    {otpLoading ? <><span className="spinner" /> Sending OTP...</> : 'Verify Email & Continue →'}
+                  </button>
+
+                  <div style={{ display: 'flex', alignItems: 'center', margin: '18px 0 12px 0', gap: 10 }}>
+                    <div style={{ flex: 1, height: 1, background: 'var(--border-color)', opacity: 0.5 }} />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>or</span>
+                    <div style={{ flex: 1, height: 1, background: 'var(--border-color)', opacity: 0.5 }} />
+                  </div>
+
+                  <div id="google-register-btn" style={{ width: '100%', minHeight: 40 }} />
+                </>
+              )}
             </div>
           )}
 
@@ -235,13 +401,13 @@ export default function RegisterPage() {
                 <div className="form-group">
                   <label className="form-label">First Name</label>
                   <input name="firstName" type="text" className={`form-input ${errors.firstName ? 'error' : ''}`}
-                    placeholder="Priya" value={form.firstName} onChange={handleChange} />
+                    placeholder="Priya" value={form.firstName} onChange={handleChange} disabled={isGoogleReg && googleUser} />
                   {errors.firstName && <span className="form-error">⚠ {errors.firstName}</span>}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Surname</label>
                   <input name="surname" type="text" className={`form-input ${errors.surname ? 'error' : ''}`}
-                    placeholder="Sharma" value={form.surname} onChange={handleChange} />
+                    placeholder="Sharma" value={form.surname} onChange={handleChange} disabled={isGoogleReg && googleUser} />
                   {errors.surname && <span className="form-error">⚠ {errors.surname}</span>}
                 </div>
               </div>
@@ -258,11 +424,14 @@ export default function RegisterPage() {
                 {errors.phone && <span className="form-error">⚠ {errors.phone}</span>}
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button type="button" onClick={prevStep} className="btn-ghost" style={{ flex: 1, justifyContent: 'center', padding: '13px' }}>← Back</button>
-                <button type="button" onClick={nextStep} className="btn-primary" style={{ flex: 2, justifyContent: 'center', padding: '13px' }}>Continue →</button>
+                {!isGoogleReg && (
+                  <button type="button" onClick={prevStep} className="btn-ghost" style={{ flex: 1, justifyContent: 'center', padding: '13px' }}>← Back</button>
+                )}
+                <button type="button" onClick={nextStep} className="btn-primary" style={{ flex: isGoogleReg ? 1 : 2, justifyContent: 'center', padding: '13px' }}>Continue →</button>
               </div>
             </div>
           )}
+
 
           {/* Step 2 — Location */}
           {step === 2 && (

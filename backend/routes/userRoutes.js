@@ -1,4 +1,15 @@
-import { authUser, logoutUser, registerUser, uploadAdharDocument, getUserProfile, updateUserProfile, linkUserWallet } from "../controllers/userController.js";
+import {
+  authUser,
+  logoutUser,
+  registerUser,
+  uploadAdharDocument,
+  getUserProfile,
+  updateUserProfile,
+  linkUserWallet,
+  sendOTP,
+  verifyOTP,
+  googleAuth
+} from "../controllers/userController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import express from "express";
 import {uploadNgoDocuments as uploadDocumentsToS3 } from "../s3Config.js";
@@ -8,6 +19,9 @@ const router = express.Router();
 router.route("/register").post(registerUser);
 router.post("/auth", authUser);
 router.post("/logout", logoutUser);
+router.post("/google-auth", googleAuth);
+router.post("/send-otp", sendOTP);
+router.post("/verify-otp", verifyOTP);
 router.route("/profile").get(protect, getUserProfile).put(protect, updateUserProfile);
 router.put("/link-wallet", protect, linkUserWallet);
 
