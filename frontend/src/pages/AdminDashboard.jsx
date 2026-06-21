@@ -291,6 +291,7 @@ function VerificationModal({ onConfirm, onCancel }) {
           try {
             const data = JSON.parse(text);
             if (data.verificationCode) setCode(data.verificationCode);
+            else if (data.token) setCode(data.token);
             else setCode(text);
           } catch {
             setCode(text);
@@ -758,6 +759,14 @@ export default function AdminDashboard() {
   const [tokenSearch, setTokenSearch] = useState('');
   const [tokenResult, setTokenResult] = useState(null);
   const [tokenModalOpen, setTokenModalOpen] = useState(false);
+  const [adminFulfillmentModal, setAdminFulfillmentModal] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('admin_sidebar_collapsed') === 'true');
+
+  const toggleSidebar = () => {
+    const val = !sidebarCollapsed;
+    setSidebarCollapsed(val);
+    localStorage.setItem('admin_sidebar_collapsed', String(val));
+  };
 
   useEffect(() => {
     if (location.state?.tab) {
@@ -921,7 +930,24 @@ export default function AdminDashboard() {
   // NGO food request actions
   const approveNgoRequest = async (id) => { try { await api.put(`/aahar/admin/ngo-food-requests/${id}/approve`); showToast('NGO request approved ✅', 'success'); fetchNgoRequests(); } catch { showToast('Failed', 'error'); } };
   const rejectNgoRequest = async (id, reason) => { try { await api.put(`/aahar/admin/ngo-food-requests/${id}/reject`, { rejectionReason: reason }); showToast('NGO request rejected', 'success'); setNgoRejectModal(null); fetchNgoRequests(); } catch { showToast('Failed', 'error'); } };
-  const fulfillNgoRequest = async (id) => { try { await api.put(`/aahar/admin/ngo-food-requests/${id}/fulfill`); showToast('NGO request marked as Fulfilled 🚚', 'success'); fetchNgoRequests(); } catch { showToast('Failed to fulfill', 'error'); } };
+  const fulfillNgoRequest = async (id) => {
+    try {
+      const res = await api.put(`/aahar/admin/ngo-food-requests/${id}/fulfill`);
+      if (res.data?.request?.status === 'REQUEST_ACCEPTED') {
+        showToast('NGO request accepted for fulfillment! 🚚', 'success');
+        setAdminFulfillmentModal({
+          token: res.data.request.verificationToken,
+          requestId: res.data.request._id,
+          ngoName: res.data.request.ngoId?.ngoName || 'NGO'
+        });
+      } else {
+        showToast('NGO request marked as Fulfilled 🚚', 'success');
+      }
+      fetchNgoRequests();
+    } catch {
+      showToast('Failed to fulfill', 'error');
+    }
+  };
 
   // Token search
   const handleTokenSearch = async () => {
@@ -1040,72 +1066,133 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="dashboard-layout">
+    <div className="dashboard-layout" style={{ '--sidebar-w': sidebarCollapsed ? '78px' : '260px' }}>
       {/* Sidebar */}
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-sidebar__brand">
-          <span>⚡</span>
-          <span className="gradient-text" style={{ fontWeight: 800 }}>Admin Panel</span>
+      <aside className="dashboard-sidebar" style={{ padding: sidebarCollapsed ? '24px 10px' : '24px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: 16, marginBottom: 20 }}>
+          {!sidebarCollapsed ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '1.05rem', fontWeight: 800 }}>
+              <span>⚡</span>
+              <span className="gradient-text" style={{ fontWeight: 800 }}>Admin Panel</span>
+            </div>
+          ) : (
+            <span style={{ fontSize: '1.4rem' }}>⚡</span>
+          )}
+          <button 
+            onClick={toggleSidebar} 
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 6,
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              fontSize: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              marginLeft: sidebarCollapsed ? 0 : 8,
+              marginTop: sidebarCollapsed ? 8 : 0
+            }}
+            title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-orange)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+          >
+            {sidebarCollapsed ? '▶' : '◀'}
+          </button>
         </div>
 
-        <div className="dashboard-sidebar__nav-section-title">Management</div>
+        {!sidebarCollapsed && <div className="dashboard-sidebar__nav-section-title">Management</div>}
+        {sidebarCollapsed && <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '12px 0 8px' }} />}
         <nav className="dashboard-sidebar__nav">
           {TABS.map(t => (
-            <button key={t.id} className={`dashboard-sidebar__nav-item ${tab === t.id ? 'dashboard-sidebar__nav-item--active' : ''}`} onClick={() => handleTabChange(t.id)}>
-              <span>{t.icon}</span> {t.label}
-              {t.id === 'users' && users.length > 0 && tab !== 'users' && (
-                <span style={{ marginLeft: 'auto', background: 'rgba(6,182,212,0.15)', color: 'var(--color-teal)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
-                  {users.length}
-                </span>
-              )}
-              {t.id === 'direct-donations' && directDonations.filter(d => {
-                const s = (d.status || '').replace(/_/g, '').toUpperCase();
-                return s === 'PENDINGNGOACCEPTANCE' || s === 'NGOACCEPTED' || s === 'APPROVED';
-              }).length > 0 && tab !== 'direct-donations' && (
-                <span style={{ marginLeft: 'auto', background: 'rgba(6,182,212,0.15)', color: 'var(--color-teal)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
-                  {directDonations.filter(d => {
+            <button key={t.id} className={`dashboard-sidebar__nav-item ${tab === t.id ? 'dashboard-sidebar__nav-item--active' : ''}`} onClick={() => handleTabChange(t.id)} style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }}>
+              {sidebarCollapsed ? (
+                <div style={{ position: 'relative', display: 'inline-flex', width: '100%', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '1.2rem' }} title={t.label}>{t.icon}</span>
+                  {/* Miniature alert indicators */}
+                  {t.id === 'users' && users.length > 0 && tab !== 'users' && (
+                    <span style={{ position: 'absolute', top: -2, right: 12, background: 'var(--color-teal)', width: 6, height: 6, borderRadius: '50%' }} />
+                  )}
+                  {t.id === 'direct-donations' && directDonations.filter(d => {
                     const s = (d.status || '').replace(/_/g, '').toUpperCase();
                     return s === 'PENDINGNGOACCEPTANCE' || s === 'NGOACCEPTED' || s === 'APPROVED';
-                  }).length}
-                </span>
-              )}
-              {t.id === 'ngos' && ngos.filter(n => !n.isApproved).length > 0 && tab !== 'ngos' && (
-                <span style={{ marginLeft: 'auto', background: 'rgba(234,179,8,0.15)', color: 'var(--color-yellow)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
-                  {ngos.filter(n => !n.isApproved).length} pending
-                </span>
-              )}
-              {t.id === 'ngo-requests' && ngoRequests.filter(r => isRequestStatusMatch(r.status, 'pending')).length > 0 && tab !== 'ngo-requests' && (
-                <span style={{ marginLeft: 'auto', background: 'rgba(249,115,22,0.15)', color: 'var(--color-orange)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
-                  {ngoRequests.filter(r => isRequestStatusMatch(r.status, 'pending')).length}
-                </span>
+                  }).length > 0 && tab !== 'direct-donations' && (
+                    <span style={{ position: 'absolute', top: -2, right: 12, background: 'var(--color-teal)', width: 6, height: 6, borderRadius: '50%' }} />
+                  )}
+                  {t.id === 'ngos' && ngos.filter(n => !n.isApproved).length > 0 && tab !== 'ngos' && (
+                    <span style={{ position: 'absolute', top: -2, right: 12, background: 'var(--color-yellow)', width: 6, height: 6, borderRadius: '50%' }} />
+                  )}
+                  {t.id === 'ngo-requests' && ngoRequests.filter(r => isRequestStatusMatch(r.status, 'pending')).length > 0 && tab !== 'ngo-requests' && (
+                    <span style={{ position: 'absolute', top: -2, right: 12, background: 'var(--color-orange)', width: 6, height: 6, borderRadius: '50%' }} />
+                  )}
+                </div>
+              ) : (
+                <>
+                  <span>{t.icon}</span> {t.label}
+                  {t.id === 'users' && users.length > 0 && tab !== 'users' && (
+                    <span style={{ marginLeft: 'auto', background: 'rgba(6,182,212,0.15)', color: 'var(--color-teal)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
+                      {users.length}
+                    </span>
+                  )}
+                  {t.id === 'direct-donations' && directDonations.filter(d => {
+                    const s = (d.status || '').replace(/_/g, '').toUpperCase();
+                    return s === 'PENDINGNGOACCEPTANCE' || s === 'NGOACCEPTED' || s === 'APPROVED';
+                  }).length > 0 && tab !== 'direct-donations' && (
+                    <span style={{ marginLeft: 'auto', background: 'rgba(6,182,212,0.15)', color: 'var(--color-teal)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
+                      {directDonations.filter(d => {
+                        const s = (d.status || '').replace(/_/g, '').toUpperCase();
+                        return s === 'PENDINGNGOACCEPTANCE' || s === 'NGOACCEPTED' || s === 'APPROVED';
+                      }).length}
+                    </span>
+                  )}
+                  {t.id === 'ngos' && ngos.filter(n => !n.isApproved).length > 0 && tab !== 'ngos' && (
+                    <span style={{ marginLeft: 'auto', background: 'rgba(234,179,8,0.15)', color: 'var(--color-yellow)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
+                      {ngos.filter(n => !n.isApproved).length} pending
+                    </span>
+                  )}
+                  {t.id === 'ngo-requests' && ngoRequests.filter(r => isRequestStatusMatch(r.status, 'pending')).length > 0 && tab !== 'ngo-requests' && (
+                    <span style={{ marginLeft: 'auto', background: 'rgba(249,115,22,0.15)', color: 'var(--color-orange)', fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99 }}>
+                      {ngoRequests.filter(r => isRequestStatusMatch(r.status, 'pending')).length}
+                    </span>
+                  )}
+                </>
               )}
             </button>
           ))}
         </nav>
 
-        <div className="dashboard-sidebar__nav-section-title" style={{ marginTop: 8 }}>Quick Stats</div>
-        <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 8 }}>
-          {[['📦', 'Donations', stats?.totalDonations], ['👥', 'Users', stats?.totalUsers], ['🏢', 'NGOs', stats?.totalNgos]].map(([icon, label, val]) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>{icon} {label}</span>
-              <span style={{ fontWeight: 700 }}>{val ?? '—'}</span>
+        {!sidebarCollapsed && (
+          <>
+            <div className="dashboard-sidebar__nav-section-title" style={{ marginTop: 8 }}>Quick Stats</div>
+            <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 8 }}>
+              {[['📦', 'Donations', stats?.totalDonations], ['👥', 'Users', stats?.totalUsers], ['🏢', 'NGOs', stats?.totalNgos]].map(([icon, label, val]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{icon} {label}</span>
+                  <span style={{ fontWeight: 700 }}>{val ?? '—'}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
 
-        <div className="dashboard-sidebar__user">
-          <div className="dashboard-sidebar__avatar dashboard-sidebar__avatar--admin">
+        <div className="dashboard-sidebar__user" style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '16px 0 0' : '16px 8px 0' }}>
+          <div className="dashboard-sidebar__avatar dashboard-sidebar__avatar--admin" title={sidebarCollapsed ? `${user?.firstName} (Administrator)` : undefined}>
             {(user?.firstName || 'A')[0].toUpperCase()}
           </div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.firstName}</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--color-teal)' }}>Administrator</div>
-          </div>
+          {!sidebarCollapsed && (
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.firstName}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-teal)' }}>Administrator</div>
+            </div>
+          )}
         </div>
-        <button onClick={handleLogout} style={{ width: '100%', marginTop: 10, padding: '10px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--radius-md)', color: 'var(--color-red)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s' }}
+        <button onClick={handleLogout} style={{ width: '100%', marginTop: 10, padding: sidebarCollapsed ? '10px 0' : '10px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--radius-md)', color: 'var(--color-red)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', gap: sidebarCollapsed ? 0 : 8, transition: 'all 0.2s' }}
+          title={sidebarCollapsed ? "Logout" : undefined}
           onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.12)'}
           onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.06)'}>
-          🚪 Logout
+          <span>🚪</span> {!sidebarCollapsed && 'Logout'}
         </button>
       </aside>
 
@@ -1980,7 +2067,13 @@ export default function AdminDashboard() {
                           </>
                         )}
                         {req.status === 'approved' && (
-                          <ActionBtn icon="🚚" label="Mark Fulfilled" onClick={() => fulfillNgoRequest(req._id)} variant="primary" />
+                          <ActionBtn icon="🚚" label="Fulfill Request" onClick={() => fulfillNgoRequest(req._id)} variant="primary" />
+                        )}
+                        {req.status === 'REQUEST_ACCEPTED' && (
+                          <>
+                            <ActionBtn icon="🚚" label="Force Mark Fulfilled" onClick={() => fulfillNgoRequest(req._id)} variant="primary" />
+                            <ActionBtn icon="🎫" label="View Verification QR" onClick={() => setAdminFulfillmentModal({ token: req.verificationToken, requestId: req._id, ngoName: req.ngoId?.ngoName || 'NGO' })} variant="teal" />
+                          </>
                         )}
                       </div>
                     </div>
@@ -2313,35 +2406,403 @@ export default function AdminDashboard() {
 
       {/* Token Result Modal */}
       {tokenModalOpen && tokenResult && (
-        <div className="modal-overlay" onClick={() => setTokenModalOpen(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 720 }}>
-            <h3 className="modal__title">Search Result for Token</h3>
-            <div style={{ display: 'flex', gap: 12, flexDirection: 'column' }}>
-              {tokenResult.donation ? (
-                <div>
-                  <h4>Donation</h4>
-                  <div>Donation ID: <strong>{tokenResult.donation._id}</strong></div>
-                  <div>Donor: <strong>{tokenResult.donation.foodItemDetails?.[0]?.donorId ? `${tokenResult.donation.foodItemDetails[0].donorId.firstName} ${tokenResult.donation.foodItemDetails[0].donorId.surname}` : '—'}</strong></div>
-                  <div>Phone: <strong>{tokenResult.donation.foodItemDetails?.[0]?.donorId?.phone || tokenResult.donation.contactDetails?.phoneNumber || '—'}</strong></div>
-                  <div>Items: {(tokenResult.donation.foodItemDetails || []).map(i => `${i.foodName} (${i.quantity}${i.quantityType})`).join(', ')}</div>
-                  {tokenResult.donation.foodItemDetails?.[0]?.imageUrl?.length > 0 && (
-                    <img src={tokenResult.donation.foodItemDetails[0].imageUrl[0]} alt="item" style={{ maxWidth: 160, borderRadius: 8 }} />
-                  )}
-                </div>
-              ) : null}
+        <div className="modal-overlay" onClick={() => setTokenModalOpen(false)} style={{ zIndex: 100 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 720, width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 className="modal__title" style={{ fontSize: '1.25rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+              🔍 Search Result Details
+            </h3>
 
-              {tokenResult.request ? (
-                <div>
-                  <h4>NGO Request</h4>
-                  <div>Request ID: <strong>{tokenResult.request._id}</strong></div>
-                  <div>NGO: <strong>{tokenResult.request.ngoId?.ngoName}</strong></div>
-                  <div>Contact: <strong>{tokenResult.request.contactDetails?.phoneNumber || tokenResult.request.ngoId?.ngoPhone || '—'}</strong></div>
-                  <div>Items: {(tokenResult.request.foodItemsNeeded || []).map(i => `${i.foodName} (${i.quantity}${i.quantityType})`).join(', ')}</div>
+            <div style={{ display: 'flex', gap: 24, flexDirection: 'column' }}>
+              {tokenResult.donation && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {/* Header Info */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: 12 }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--color-orange)', fontWeight: 800 }}>Donation Record</span>
+                      <h4 style={{ margin: '4px 0 0 0', fontSize: '1.1rem', fontWeight: 800, fontFamily: 'monospace' }}>
+                        #{tokenResult.donation._id}
+                      </h4>
+                    </div>
+                    <div>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        padding: '4px 12px',
+                        borderRadius: 99,
+                        fontWeight: 700,
+                        background: 
+                          ['done', 'completed', 'verified', 'completed'].includes(tokenResult.donation.status.toLowerCase()) ? 'rgba(34,197,94,0.15)' :
+                          tokenResult.donation.status.toLowerCase() === 'rejected' ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
+                        color: 
+                          ['done', 'completed', 'verified', 'completed'].includes(tokenResult.donation.status.toLowerCase()) ? '#4ade80' :
+                          tokenResult.donation.status.toLowerCase() === 'rejected' ? '#f87171' : '#fbbf24'
+                      }}>
+                        {tokenResult.donation.status.toUpperCase().replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Donor vs Recipient Section */}
+                  <div>
+                    <h5 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, fontWeight: 700 }}>
+                      🤝 Who Donated to Whom
+                    </h5>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      {/* Donor Box */}
+                      <div style={{ background: 'rgba(249, 115, 22, 0.03)', border: '1px solid rgba(249, 115, 22, 0.15)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.85rem', color: 'var(--color-orange)', marginBottom: 12 }}>
+                          <span>👤 Donor Details</span>
+                        </div>
+                        {(() => {
+                          const donor = tokenResult.donation.foodItemDetails?.[0]?.donorId;
+                          if (donor && typeof donor === 'object') {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.82rem' }}>
+                                <div>Name: <strong style={{ color: 'var(--text-primary)' }}>{donor.firstName} {donor.surname}</strong></div>
+                                <div>Email: <strong style={{ color: 'var(--text-primary)' }}>{donor.email}</strong></div>
+                                {donor.phone && <div>Phone: <strong style={{ color: 'var(--text-primary)' }}>📞 {donor.phone}</strong></div>}
+                                {donor.city && <div>City: <strong style={{ color: 'var(--text-primary)' }}>📍 {donor.city}</strong></div>}
+                                <div>Verified Status: <strong style={{ color: donor.isVerified ? '#4ade80' : '#f87171' }}>{donor.isVerified ? 'Verified ✓' : 'Unverified'}</strong></div>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.82rem' }}>
+                                <div>Contact: <strong style={{ color: 'var(--text-primary)' }}>{tokenResult.donation.contactDetails?.contactPersonName || '—'}</strong></div>
+                                <div>Phone: <strong style={{ color: 'var(--text-primary)' }}>{tokenResult.donation.contactDetails?.phoneNumber || '—'}</strong></div>
+                                <div>Email: <strong style={{ color: 'var(--text-primary)' }}>{tokenResult.donation.contactDetails?.email || '—'}</strong></div>
+                                <div>City: <strong style={{ color: 'var(--text-primary)' }}>{tokenResult.donation.contactDetails?.city || '—'}</strong></div>
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+
+                      {/* Recipient Box */}
+                      <div style={{ background: 'rgba(6, 182, 212, 0.03)', border: '1px solid rgba(6, 182, 212, 0.15)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.85rem', color: 'var(--color-teal)', marginBottom: 12 }}>
+                          <span>🏢 Recipient NGO Details</span>
+                        </div>
+                        {(() => {
+                          const pickedNgo = tokenResult.donation.pickedUpByNgo;
+                          const prefNgo = typeof tokenResult.donation.ngoPreference === 'object' && tokenResult.donation.ngoPreference?._id ? tokenResult.donation.ngoPreference : null;
+                          
+                          if (pickedNgo) {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.82rem' }}>
+                                <div style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.15)', color: '#4ade80', fontWeight: 700, alignSelf: 'flex-start' }}>Claimed & Picked Up</div>
+                                <div>NGO: <strong style={{ color: 'var(--text-primary)' }}>{pickedNgo.ngoName}</strong></div>
+                                <div>Email: <strong style={{ color: 'var(--text-primary)' }}>{pickedNgo.ngoEmail}</strong></div>
+                                {pickedNgo.ngoPhone && <div>Phone: <strong style={{ color: 'var(--text-primary)' }}>📞 {pickedNgo.ngoPhone}</strong></div>}
+                                <div>Location: <strong style={{ color: 'var(--text-primary)' }}>📍 {pickedNgo.ngoCity}</strong></div>
+                              </div>
+                            );
+                          } else if (prefNgo) {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.82rem' }}>
+                                <div style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: 4, background: 'rgba(6,182,212,0.15)', color: '#22d3ee', fontWeight: 700, alignSelf: 'flex-start' }}>Direct Donation Preference</div>
+                                <div>NGO: <strong style={{ color: 'var(--text-primary)' }}>{prefNgo.ngoName}</strong></div>
+                                <div>Email: <strong style={{ color: 'var(--text-primary)' }}>{prefNgo.ngoEmail}</strong></div>
+                                {prefNgo.ngoPhone && <div>Phone: <strong style={{ color: 'var(--text-primary)' }}>📞 {prefNgo.ngoPhone}</strong></div>}
+                                <div>Location: <strong style={{ color: 'var(--text-primary)' }}>📍 {prefNgo.ngoCity}</strong></div>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 100, border: '1px dashed var(--border-color)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                                <span style={{ fontSize: '1.25rem', marginBottom: 4 }}>🎁</span>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>General Donation</div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Awaiting claim/pickup by an approved NGO</div>
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Food Items Details */}
+                  <div>
+                    <h5 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, fontWeight: 700 }}>
+                      🍱 Food Items Donated
+                    </h5>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {(tokenResult.donation.foodItemDetails || []).map((item, idx) => (
+                        <div key={idx} style={{ padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 10, display: 'flex', gap: 12, alignItems: 'center' }}>
+                          {item.imageUrl && item.imageUrl.length > 0 && (
+                            <img 
+                              src={item.imageUrl[0]} 
+                              alt={item.foodName} 
+                              style={{ width: 52, height: 52, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border-color)', flexShrink: 0 }} 
+                            />
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{item.foodName}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                              Category: {item.category} · Expiry: {new Date(item.expiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </div>
+                            {item.packaging && (
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                Packaging: {item.packaging}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontWeight: 800, color: 'var(--color-orange)', fontSize: '0.95rem' }}>
+                            {item.quantity} {item.quantityType}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Logistics & Verification */}
+                  <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 12, padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                    <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div>📅 <strong>Created:</strong> {new Date(tokenResult.donation.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                      {tokenResult.donation.completedAt && (
+                        <div>✅ <strong>Completed:</strong> {new Date(tokenResult.donation.completedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                      )}
+                      {tokenResult.donation.contactDetails?.fullAddress && (
+                        <div style={{ marginTop: 4 }}>📍 <strong>Pickup Address:</strong> {tokenResult.donation.contactDetails.fullAddress}</div>
+                      )}
+                    </div>
+                    
+                    {tokenResult.donation.verificationToken && (
+                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                        <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', fontWeight: 600 }}>Verification Token</span>
+                        <code style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)', padding: '4px 10px', borderRadius: 6, color: 'var(--color-orange)', fontWeight: 800, fontSize: '1rem', letterSpacing: 1 }}>
+                          {tokenResult.donation.verificationToken}
+                        </code>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ) : null}
+              )}
+
+              {tokenResult.donation && tokenResult.request && (
+                <hr style={{ border: 'none', borderTop: '1px dashed var(--border-color)', margin: '4px 0' }} />
+              )}
+
+              {tokenResult.request && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {/* Header Info */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: 12 }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--color-teal)', fontWeight: 800 }}>NGO Food Request</span>
+                      <h4 style={{ margin: '4px 0 0 0', fontSize: '1.1rem', fontWeight: 800, fontFamily: 'monospace' }}>
+                        #{tokenResult.request._id}
+                      </h4>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        background: 
+                          tokenResult.request.urgencyLevel === 'critical' ? 'rgba(239,68,68,0.15)' :
+                          tokenResult.request.urgencyLevel === 'high' ? 'rgba(249,115,22,0.15)' :
+                          tokenResult.request.urgencyLevel === 'medium' ? 'rgba(234,179,8,0.15)' : 'rgba(59,130,246,0.15)',
+                        color: 
+                          tokenResult.request.urgencyLevel === 'critical' ? '#ef4444' :
+                          tokenResult.request.urgencyLevel === 'high' ? '#f97316' :
+                          tokenResult.request.urgencyLevel === 'medium' ? '#fbbf24' : '#3b82f6',
+                        fontWeight: 700
+                      }}>
+                        {tokenResult.request.urgencyLevel ? tokenResult.request.urgencyLevel.toUpperCase() : 'MEDIUM'} PRIORITY
+                      </span>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        padding: '4px 12px',
+                        borderRadius: 99,
+                        fontWeight: 700,
+                        background: 
+                          ['fulfilled', 'completed', 'verified', 'completed'].includes(tokenResult.request.status.toLowerCase()) ? 'rgba(34,197,94,0.15)' :
+                          tokenResult.request.status.toLowerCase() === 'rejected' ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
+                        color: 
+                          ['fulfilled', 'completed', 'verified', 'completed'].includes(tokenResult.request.status.toLowerCase()) ? '#4ade80' :
+                          tokenResult.request.status.toLowerCase() === 'rejected' ? '#f87171' : '#fbbf24'
+                      }}>
+                        {tokenResult.request.status.toUpperCase().replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Donor vs Recipient Section */}
+                  <div>
+                    <h5 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, fontWeight: 700 }}>
+                      🤝 Who Donated to Whom
+                    </h5>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      {/* Recipient NGO Box */}
+                      <div style={{ background: 'rgba(6, 182, 212, 0.03)', border: '1px solid rgba(6, 182, 212, 0.15)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.85rem', color: 'var(--color-teal)', marginBottom: 12 }}>
+                          <span>🏢 Requesting NGO</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.82rem' }}>
+                          <div>NGO: <strong style={{ color: 'var(--text-primary)' }}>{tokenResult.request.ngoId?.ngoName || '—'}</strong></div>
+                          <div>Submitted By: <strong style={{ color: 'var(--text-primary)' }}>{tokenResult.request.requestedBy ? `${tokenResult.request.requestedBy.firstName} ${tokenResult.request.requestedBy.surname}` : '—'}</strong></div>
+                          <div>Contact Email: <strong style={{ color: 'var(--text-primary)' }}>{tokenResult.request.contactDetails?.email || tokenResult.request.ngoId?.ngoEmail || '—'}</strong></div>
+                          <div>Contact Phone: <strong style={{ color: 'var(--text-primary)' }}>📞 {tokenResult.request.contactDetails?.phoneNumber || tokenResult.request.ngoId?.ngoPhone || '—'}</strong></div>
+                          {tokenResult.request.numberOfBeneficiaries > 0 && (
+                            <div>Beneficiaries: <strong style={{ color: 'var(--text-primary)' }}>👥 {tokenResult.request.numberOfBeneficiaries} people</strong></div>
+                          )}
+                          <div>Location: <strong style={{ color: 'var(--text-primary)' }}>📍 {tokenResult.request.contactDetails?.city || tokenResult.request.ngoId?.ngoCity || '—'}</strong></div>
+                          {tokenResult.request.purpose && (
+                            <div style={{ marginTop: 6, background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                              <strong>Purpose:</strong> "{tokenResult.request.purpose}"
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Fulfilling Donor Box */}
+                      <div style={{ background: 'rgba(249, 115, 22, 0.03)', border: '1px solid rgba(249, 115, 22, 0.15)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.85rem', color: 'var(--color-orange)', marginBottom: 12 }}>
+                          <span>👤 Fulfilling Donor Details</span>
+                        </div>
+                        {(() => {
+                          const donor = tokenResult.request.acceptedBy;
+                          if (donor && typeof donor === 'object') {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.82rem' }}>
+                                <div style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.15)', color: '#4ade80', fontWeight: 700, alignSelf: 'flex-start' }}>Accepted / Claimed by Donor</div>
+                                <div>Name: <strong style={{ color: 'var(--text-primary)' }}>{donor.firstName} {donor.surname}</strong></div>
+                                <div>Email: <strong style={{ color: 'var(--text-primary)' }}>{donor.email}</strong></div>
+                                {donor.phone && <div>Phone: <strong style={{ color: 'var(--text-primary)' }}>📞 {donor.phone}</strong></div>}
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 100, border: '1px dashed var(--border-color)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                                <span style={{ fontSize: '1.25rem', marginBottom: 4 }}>⏳</span>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>Awaiting Donor</div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>This request has not been claimed by any donor yet</div>
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Food Items Needed */}
+                  <div>
+                    <h5 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, fontWeight: 700 }}>
+                      🍱 Food Items Requested
+                    </h5>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {(tokenResult.request.foodItemsNeeded || []).map((item, idx) => (
+                        <div key={idx} style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: '1rem' }}>🍎</span>
+                          <div>
+                            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{item.foodName}</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 8 }}>({item.category})</span>
+                          </div>
+                          <div style={{ marginLeft: 12, fontWeight: 800, color: 'var(--color-orange)', fontSize: '0.9rem' }}>
+                            {item.quantity} {item.quantityType}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Logistics & Verification */}
+                  <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 12, padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                    <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div>📅 <strong>Created:</strong> {new Date(tokenResult.request.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                      {tokenResult.request.expectedDeliveryDate && (
+                        <div>🚚 <strong>Expected Delivery:</strong> {new Date(tokenResult.request.expectedDeliveryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                      )}
+                      {tokenResult.request.fulfilledAt && (
+                        <div>✅ <strong>Fulfilled At:</strong> {new Date(tokenResult.request.fulfilledAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                      )}
+                      {tokenResult.request.contactDetails?.deliveryAddress && (
+                        <div style={{ marginTop: 4 }}>📍 <strong>Delivery Address:</strong> {tokenResult.request.contactDetails.deliveryAddress}</div>
+                      )}
+                    </div>
+                    
+                    {tokenResult.request.verificationToken && (
+                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                        <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', fontWeight: 600 }}>Verification Code</span>
+                        <code style={{ background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.3)', padding: '4px 10px', borderRadius: 6, color: 'var(--color-teal)', fontWeight: 800, fontSize: '1rem', letterSpacing: 1 }}>
+                          {tokenResult.request.verificationToken}
+                        </code>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!tokenResult.donation && !tokenResult.request && (
+                <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🔍</div>
+                  <h4 style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>No records found</h4>
+                  <p style={{ fontSize: '0.82rem', margin: 0 }}>We couldn't find any donation or request matching token/ID "{tokenSearch}"</p>
+                </div>
+              )}
             </div>
-            <div className="modal__actions" style={{ marginTop: 16 }}>
+
+            <div className="modal__actions" style={{ marginTop: 24, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
               <button className="btn-ghost" onClick={() => setTokenModalOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Fulfillment QR/Token Modal */}
+      {adminFulfillmentModal && (
+        <div className="modal-overlay" onClick={() => setAdminFulfillmentModal(null)} style={{ zIndex: 1100 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 460, width: '90%', padding: 28, background: 'rgba(17,24,39,0.95)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem', marginBottom: 12 }}>🎫</div>
+            <h3 className="modal__title" style={{ fontSize: '1.25rem', marginBottom: 8, fontWeight: 800, color: 'var(--color-teal)' }}>
+              Fulfillment Initiated!
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
+              Share this Verification Code or QR Code with the NGO representative. They will scan/enter it on their portal to confirm receipt.
+            </p>
+
+            {/* QR Code */}
+            <div style={{ 
+              background: '#ffffff', 
+              padding: 12, 
+              borderRadius: 10, 
+              width: 154, 
+              height: 154, 
+              margin: '0 auto 16px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(JSON.stringify({ type: 'request', id: adminFulfillmentModal.requestId, token: adminFulfillmentModal.token }))}`}
+                alt="Delivery QR Pass"
+                style={{ width: 130, height: 130 }}
+              />
+            </div>
+
+            {/* Token */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
+                Verification Code
+              </div>
+              <div style={{ 
+                fontFamily: 'monospace', 
+                fontSize: '1.35rem', 
+                fontWeight: 800, 
+                color: 'var(--color-orange)', 
+                background: 'rgba(255,255,255,0.03)', 
+                border: '1px solid var(--border-color)',
+                borderRadius: 6,
+                padding: '6px 12px',
+                display: 'inline-block',
+                letterSpacing: 2
+              }}>
+                {adminFulfillmentModal.token}
+              </div>
+            </div>
+
+            <div className="modal__actions" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 16, justifyContent: 'center' }}>
+              <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setAdminFulfillmentModal(null)}>Done</button>
             </div>
           </div>
         </div>

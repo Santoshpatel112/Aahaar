@@ -18,11 +18,15 @@ import statsRoutes from "./routes/statsRoutes.js";
 import ngoFoodRequestRoutes from "./routes/ngoFoodRequestRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js";
+import { startBlockchainListeners } from "./blockchain/listeners.js";
 
 const port = process.env.PORT || 5000;
 
 // Connect to MongoDB
 connectDb();
+
+// Start Smart Contract Event Listeners
+startBlockchainListeners();
 
 const app = express();
 

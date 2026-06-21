@@ -13,6 +13,7 @@
     "@reduxjs/toolkit": "^2.12.0",
     "axios": "^1.18.0",
     "country-state-city": "^3.2.1",
+    "ethers": "^6.17.0",
     "firebase": "^12.15.0",
     "html5-qrcode": "^2.3.8",
     "react": "^19.2.6",

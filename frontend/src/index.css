@@ -564,6 +564,15 @@ body.light-theme .navbar__user-btn:hover {
   background: rgba(15, 23, 42, 0.08) !important;
 }
 
+body.light-theme .categories {
+  background: rgba(15, 23, 42, 0.02) !important;
+}
+
+body.light-theme .footer {
+  background: var(--bg-secondary) !important;
+  border-top-color: rgba(15, 23, 42, 0.08) !important;
+}
+
 body.light-theme .form-input,
 body.light-theme select.form-input,
 body.light-theme textarea.form-input {

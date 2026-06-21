@@ -76,7 +76,11 @@ const notificationSlice = createSlice({
   },
   reducers: {
     addLiveNotification: (state, action) => {
-      const exists = state.items.some((item) => item._id === action.payload._id);
+      const exists = state.items.some(
+        (item) => 
+          item._id === action.payload._id ||
+          (item.title === action.payload.title && item.message === action.payload.message && item.type === action.payload.type)
+      );
       if (!exists) {
         state.items.unshift(action.payload);
         if (!action.payload.isRead) {
@@ -100,8 +104,20 @@ const notificationSlice = createSlice({
       })
       .addCase(fetchNotifications.fulfilled, (state, action) => {
         state.loading = false;
-        state.items = action.payload;
-        state.unreadCount = action.payload.filter((item) => !item.isRead).length;
+        // Deduplicate notifications list by ID and title+message+type signature
+        const uniqueItems = [];
+        const seen = new Set();
+        (action.payload || []).forEach(item => {
+          const signature = `${item.title}_${item.message}_${item.type}`;
+          const isDup = seen.has(item._id) || seen.has(signature);
+          if (!isDup) {
+            seen.add(item._id);
+            seen.add(signature);
+            uniqueItems.push(item);
+          }
+        });
+        state.items = uniqueItems;
+        state.unreadCount = uniqueItems.filter((item) => !item.isRead).length;
       })
       .addCase(fetchNotifications.rejected, (state, action) => {
         state.loading = false;

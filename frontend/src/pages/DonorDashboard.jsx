@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import { showToast } from '../components/Toast';
 import StatusBadge from '../components/StatusBadge';
+import { useWallet } from '../context/WalletContext';
 
 function SkeletonStatCard() {
   return (
@@ -49,6 +50,23 @@ const normalizeStatusForFilter = (status) => {
 
 export default function DonorDashboard() {
   const { user, logout, uploadAadhaar, refreshUser } = useAuth();
+  const { contracts, walletAddress, isConnected } = useWallet();
+  const [reputation, setReputation] = useState(0);
+
+  useEffect(() => {
+    const fetchReputation = async () => {
+      if (contracts?.ReputationSystem && walletAddress) {
+        try {
+          const rep = await contracts.ReputationSystem.getReputation(walletAddress);
+          setReputation(Number(rep));
+        } catch (err) {
+          console.error("Error fetching reputation score:", err);
+        }
+      }
+    };
+    fetchReputation();
+  }, [contracts, walletAddress]);
+
   const navigate = useNavigate();
   const location = useLocation();
   const [donations, setDonations] = useState([]);
@@ -59,6 +77,13 @@ export default function DonorDashboard() {
   const [viewPass, setViewPass] = useState(null);
   const [viewDetails, setViewDetails] = useState(null);
   const [passType, setPassType] = useState('donation'); // 'donation' | 'request'
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('donor_sidebar_collapsed') === 'true');
+
+  const toggleSidebar = () => {
+    const val = !sidebarCollapsed;
+    setSidebarCollapsed(val);
+    localStorage.setItem('donor_sidebar_collapsed', String(val));
+  };
 
   // NGO Requests Fulfillments State
   const [activeRequests, setActiveRequests] = useState([]);
@@ -177,6 +202,23 @@ export default function DonorDashboard() {
     }
     setAccepting(true);
     try {
+      if (isConnected && contracts?.Donation) {
+        try {
+          showToast("Initiating Polygon blockchain transaction... 🦊", "info");
+          const onChainReqId = acceptModal.verificationToken && acceptModal.verificationToken.startsWith("TX-")
+            ? Number(acceptModal.verificationToken.replace("TX-", ""))
+            : 1;
+          
+          const tx = await contracts.Donation.acceptDonation(onChainReqId, "");
+          showToast("Confirming transaction... ⏳", "info");
+          await tx.wait();
+          showToast("Confirmed on Polygon! 🎉", "success");
+        } catch (blockchainErr) {
+          console.error("Blockchain transaction failed:", blockchainErr);
+          showToast("Blockchain transaction failed or skipped, proceeding with database update. ⚠️", "warning");
+        }
+      }
+
       const res = await api.put(`/aahar/ngo-food-requests/${acceptModal._id}/accept`, { expectedDeliveryDate: expectedDate });
       showToast('You have accepted this food request! Verification token generated.', 'success');
       setAcceptModal(null);
@@ -187,7 +229,7 @@ export default function DonorDashboard() {
         setViewPass(res.data.request);
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to accept request', 'error');
+      showToast(err.response?.data?.message || err.message || 'Failed to accept request', 'error');
     } finally {
       setAccepting(false);
     }
@@ -258,70 +300,128 @@ export default function DonorDashboard() {
   };
 
   return (
-    <div className="dashboard-layout">
+    <div className="dashboard-layout" style={{ '--sidebar-w': sidebarCollapsed ? '78px' : '260px' }}>
       {/* Sidebar */}
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-sidebar__brand">
-          <span>🌾</span>
-          <span className="gradient-text" style={{ fontWeight: 800 }}>Aahaar</span>
+      <aside className="dashboard-sidebar" style={{ padding: sidebarCollapsed ? '24px 10px' : '24px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: 16, marginBottom: 20 }}>
+          {!sidebarCollapsed ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '1.05rem', fontWeight: 800 }}>
+              <span>🌾</span>
+              <span className="gradient-text" style={{ fontWeight: 800 }}>Aahaar</span>
+            </div>
+          ) : (
+            <span style={{ fontSize: '1.4rem' }}>🌾</span>
+          )}
+          <button 
+            onClick={toggleSidebar} 
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 6,
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              fontSize: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              marginLeft: sidebarCollapsed ? 0 : 8,
+              marginTop: sidebarCollapsed ? 8 : 0
+            }}
+            title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-orange)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+          >
+            {sidebarCollapsed ? '▶' : '◀'}
+          </button>
         </div>
 
-        <div className="dashboard-sidebar__nav-section-title">Navigation</div>
+        {!sidebarCollapsed && <div className="dashboard-sidebar__nav-section-title">Navigation</div>}
+        {sidebarCollapsed && <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '12px 0 8px' }} />}
         <nav className="dashboard-sidebar__nav">
-          <div className="dashboard-sidebar__nav-item dashboard-sidebar__nav-item--active">
-            <span>📊</span> Overview
+          <div className="dashboard-sidebar__nav-item dashboard-sidebar__nav-item--active" style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }} title={sidebarCollapsed ? "Overview" : undefined}>
+            {sidebarCollapsed ? (
+              <span style={{ fontSize: '1.2rem' }}>📊</span>
+            ) : (
+              <><span>📊</span> Overview</>
+            )}
           </div>
-          <Link to="/donate" className="dashboard-sidebar__nav-item">
-            <span>➕</span> New Donation
+          <Link to="/donate" className="dashboard-sidebar__nav-item" style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }} title={sidebarCollapsed ? "New Donation" : undefined}>
+            {sidebarCollapsed ? (
+              <span style={{ fontSize: '1.2rem' }}>➕</span>
+            ) : (
+              <><span>➕</span> New Donation</>
+            )}
           </Link>
-          <Link to="/ngo-dashboard" className="dashboard-sidebar__nav-item">
-            <span>🏢</span> NGO Portal
+          <Link to="/ngo-dashboard" className="dashboard-sidebar__nav-item" style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }} title={sidebarCollapsed ? "NGO Portal" : undefined}>
+            {sidebarCollapsed ? (
+              <span style={{ fontSize: '1.2rem' }}>🏢</span>
+            ) : (
+              <><span>🏢</span> NGO Portal</>
+            )}
           </Link>
-          <Link to="/" className="dashboard-sidebar__nav-item">
-            <span>🏠</span> Home
+          <Link to="/" className="dashboard-sidebar__nav-item" style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '11px 0' : '11px 14px' }} title={sidebarCollapsed ? "Home" : undefined}>
+            {sidebarCollapsed ? (
+              <span style={{ fontSize: '1.2rem' }}>🏠</span>
+            ) : (
+              <><span>🏠</span> Home</>
+            )}
           </Link>
         </nav>
 
-        <div className="dashboard-sidebar__nav-section-title" style={{ marginTop: 8 }}>Impact</div>
-        <div style={{ padding: '12px 14px', background: 'rgba(249,115,22,0.06)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(249,115,22,0.15)', margin: '0 0 12px' }}>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--color-orange)' }}>{approved + done}</div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>Donations Approved</div>
-          <div style={{ marginTop: 8, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)' }}>
-            <div style={{ height: '100%', width: total > 0 ? `${((approved + done) / total) * 100}%` : '0%', background: 'var(--grad-primary)', borderRadius: 99, transition: 'width 1s ease' }} />
-          </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
-            {total > 0 ? Math.round(((approved + done) / total) * 100) : 0}% success rate
-          </div>
-        </div>
+        {!sidebarCollapsed && (
+          <>
+            <div className="dashboard-sidebar__nav-section-title" style={{ marginTop: 8 }}>Impact</div>
+            <div style={{ padding: '12px 14px', background: 'rgba(249,115,22,0.06)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(249,115,22,0.15)', margin: '0 0 12px' }}>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--color-orange)' }}>{approved + done}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>Donations Approved</div>
+              <div style={{ marginTop: 8, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)' }}>
+                <div style={{ height: '100%', width: total > 0 ? `${((approved + done) / total) * 100}%` : '0%', background: 'var(--grad-primary)', borderRadius: 99, transition: 'width 1s ease' }} />
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                {total > 0 ? Math.round(((approved + done) / total) * 100) : 0}% success rate
+              </div>
+            </div>
+          </>
+        )}
 
-        <div className="dashboard-sidebar__user">
-          <div className="dashboard-sidebar__avatar">{avatarLetter}</div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.firstName} {user?.surname}
-            </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
-              📍 {user?.city}
-            </div>
-            {user?.isVerified ? (
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-green)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>✓</span> Verified Donor
-              </div>
-            ) : user?.adharVerificationDocument ? (
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-yellow)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>⏳</span> Pending Verify
-              </div>
-            ) : (
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-red)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>✕</span> Unverified Account
-              </div>
-            )}
+        <div className="dashboard-sidebar__user" style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', padding: sidebarCollapsed ? '16px 0 0' : '16px 8px 0' }}>
+          <div className="dashboard-sidebar__avatar" title={sidebarCollapsed ? `${user?.firstName} (Donor)` : undefined}>
+            {avatarLetter}
           </div>
+          {!sidebarCollapsed && (
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.firstName} {user?.surname}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
+                📍 {user?.city}
+              </div>
+              {user?.isVerified ? (
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-green)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>✓</span> Verified Donor
+                </div>
+              ) : user?.adharVerificationDocument ? (
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-yellow)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>⏳</span> Pending Verify
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-red)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>✕</span> Unverified Account
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--color-teal)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>⭐</span> Reputation: {reputation} pts
+              </div>
+            </div>
+          )}
         </div>
-        <button onClick={handleLogout} style={{ width: '100%', marginTop: 10, padding: '10px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--radius-md)', color: 'var(--color-red)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s' }}
+        <button onClick={handleLogout} style={{ width: '100%', marginTop: 10, padding: sidebarCollapsed ? '10px 0' : '10px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--radius-md)', color: 'var(--color-red)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', gap: sidebarCollapsed ? 0 : 8, transition: 'all 0.2s' }}
+          title={sidebarCollapsed ? "Logout" : undefined}
           onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.12)'}
           onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.06)'}>
-          🚪 Logout
+          <span>🚪</span> {!sidebarCollapsed && 'Logout'}
         </button>
       </aside>
 
