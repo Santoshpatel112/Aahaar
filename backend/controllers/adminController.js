@@ -794,12 +794,14 @@ const searchByToken = asyncHandler(async (req, res) => {
     throw new Error('Token is required');
   }
   const cleanToken = token.trim().replace(/^#/, '');
+  const escapedToken = cleanToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const cleanTokenLower = cleanToken.toLowerCase();
+  const escapedTokenLower = cleanTokenLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   const isObjectId = /^[0-9a-fA-F]{24}$/.test(cleanToken);
 
   let searchConditions = [
-    { verificationToken: { $regex: new RegExp("^" + cleanToken + "$", "i") } }
+    { verificationToken: { $regex: new RegExp("^" + escapedToken + "$", "i") } }
   ];
 
   if (isObjectId) {
@@ -809,7 +811,7 @@ const searchByToken = asyncHandler(async (req, res) => {
       $expr: {
         $regexMatch: {
           input: { $toString: "$_id" },
-          regex: cleanTokenLower
+          regex: escapedTokenLower
         }
       }
     });
