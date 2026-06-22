@@ -52,12 +52,13 @@ const getCityRegex = (city) => {
 const getFoodInfoByCity=asyncHandler(async(req ,res)=>{
     const city = req.user.city;
     const cityRegex = getCityRegex(city);
+    const viewAll = req.query.viewAll !== 'false'; // defaults to true
+
+    const query = viewAll ? {} : { "contactDetails.city": { $regex: cityRegex } };
     
     // ngoPreference is Mixed type (can be 'random' string or an ObjectId stored as string)
     // so we can't use .populate() directly — fetch raw then manually resolve NGO
-    const rawDonations = await FoodInfo.find({
-        "contactDetails.city": { $regex: cityRegex }
-    }).sort({ createdAt: -1 })
+    const rawDonations = await FoodInfo.find(query).sort({ createdAt: -1 })
       .populate({ path: 'foodItemDetails.donorId', select: 'firstName surname email phone city isVerified' })
       .populate({ path: 'pickedUpByNgo', select: 'ngoName ngoEmail ngoPhone ngoCity isApproved' })
       .populate({ path: 'approvedBy', select: 'firstName surname email' })

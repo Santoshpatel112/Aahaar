@@ -61,7 +61,7 @@ const getStats = async (req, res) => {
         { $unwind: "$foodItemDetails" },
         {
             $group: {
-                _id: { $dayOfWeek: "$createdAt" },
+                _id: { $dayOfWeek: { date: "$createdAt", timezone: "Asia/Kolkata" } },
                 quantity: { $sum: "$foodItemDetails.quantity" },
                 count: { $sum: 1 },
             },
@@ -81,7 +81,7 @@ const getStats = async (req, res) => {
         { $unwind: "$foodItemDetails" },
         {
             $group: {
-                _id: { $month: "$createdAt" },
+                _id: { $month: { date: "$createdAt", timezone: "Asia/Kolkata" } },
                 quantity: { $sum: "$foodItemDetails.quantity" },
                 count: { $sum: 1 },
             },
@@ -94,7 +94,7 @@ const getStats = async (req, res) => {
         { $unwind: "$foodItemDetails" },
         {
             $group: {
-                _id: { $year: "$createdAt" },
+                _id: { $year: { date: "$createdAt", timezone: "Asia/Kolkata" } },
                 quantity: { $sum: "$foodItemDetails.quantity" },
                 count: { $sum: 1 },
             },

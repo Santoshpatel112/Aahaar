@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 import https from 'https';
+import mongoose from 'mongoose';
 
 /**
  * Helper to fetch a remote image as a Buffer.
@@ -36,8 +37,27 @@ export const generateDonationReceipt = async (donation, donor, taxExemption) => 
     : new Date(donation.createdAt).toLocaleDateString('en-IN');
   const itemsSummary = taxExemption?.itemizedExemptions?.map(i => `${i.foodName} (${i.quantity} ${i.quantityType})`).join(', ') || 'Food Meals';
   
+  // Resolve recipient NGO details dynamically
+  let recipientNgo = null;
+  if (donation.pickedUpByNgo) {
+    if (typeof donation.pickedUpByNgo === 'object' && donation.pickedUpByNgo.ngoName) {
+      recipientNgo = donation.pickedUpByNgo;
+    } else if (mongoose.Types.ObjectId.isValid(donation.pickedUpByNgo)) {
+      const NGO = mongoose.model('Ngo');
+      recipientNgo = await NGO.findById(donation.pickedUpByNgo);
+    }
+  } else if (donation.ngoPreference && donation.ngoPreference !== 'random') {
+    if (typeof donation.ngoPreference === 'object' && donation.ngoPreference.ngoName) {
+      recipientNgo = donation.ngoPreference;
+    } else if (mongoose.Types.ObjectId.isValid(donation.ngoPreference)) {
+      const NGO = mongoose.model('Ngo');
+      recipientNgo = await NGO.findById(donation.ngoPreference);
+    }
+  }
+  const recipientName = recipientNgo ? recipientNgo.ngoName : 'AAHAAR';
+
   // Format details as clean text for easy smartphone scanning
-  const qrText = `AAHAAR Tax Exemption Receipt\nReceipt No: ${receiptNo}\nDate: ${dateString}\nDonor: ${donor.firstName} ${donor.surname}\nPAN: ${donor.panNumber || 'N/A'}\nExemption: INR ${taxExemption?.totalExemption.toFixed(2) || '0.00'}\nItems: ${itemsSummary}\nVerified under Sec 80G.`;
+  const qrText = `AAHAAR Tax Exemption Receipt\nReceipt No: ${receiptNo}\nDate: ${dateString}\nDonor: ${donor.firstName} ${donor.surname}\nPAN: ${donor.panNumber || 'N/A'}\nRecipient: ${recipientName}\nExemption: INR ${taxExemption?.totalExemption.toFixed(2) || '0.00'}\nItems: ${itemsSummary}\nVerified under Sec 80G.`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrText)}`;
 
   let qrBuffer = null;
@@ -117,7 +137,7 @@ export const generateDonationReceipt = async (donation, donor, taxExemption) => 
     doc.fontSize(10).fillColor('#0f172a').font('Helvetica');
     doc.text(`Receipt No: ${receiptNo}`, 250, startY + 16);
     doc.text(`Date: ${dateString}`, 250, startY + 28);
-    doc.text(`Status: Verified & Received`, 250, startY + 40);
+    doc.text(`Recipient: ${recipientName}`, 250, startY + 40, { width: 200 });
 
     // Column 3: Verification QR Code
     if (qrBuffer) {

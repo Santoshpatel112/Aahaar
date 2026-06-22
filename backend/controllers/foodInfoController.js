@@ -545,7 +545,7 @@ const rejectDirectDonation = asyncHandler(async (req, res) => {
 
 const downloadDonationReceipt = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const donation = await FoodInfo.findById(id);
+    const donation = await FoodInfo.findById(id).populate('pickedUpByNgo').populate('ngoPreference');
     if (!donation) {
         res.status(404);
         throw new Error("Donation not found");
