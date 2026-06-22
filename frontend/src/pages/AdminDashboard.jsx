@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useAuth } from '../hooks/useAuth';
@@ -744,6 +744,13 @@ export default function AdminDashboard() {
   const [reviewDonation, setReviewDonation] = useState(null);
   const [verificationModal, setVerificationModal] = useState(null);
   const [donationFilter, setDonationFilter] = useState(() => location.state?.filter || 'pending');
+  const [viewAllCities, setViewAllCities] = useState(true);
+  const viewAllCitiesRef = useRef(true);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    viewAllCitiesRef.current = viewAllCities;
+  }, [viewAllCities]);
   const [directDonationFilter, setDirectDonationFilter] = useState('all');
   const [ngoRequestFilter, setNgoRequestFilter] = useState(() => location.state?.ngoRequestFilter || 'pending');
   const [ngoFilter, setNgoFilter] = useState('all');
@@ -799,16 +806,35 @@ export default function AdminDashboard() {
     finally { setLoading(false); }
   }, []);
 
-  const fetchDonations = useCallback(async () => {
+  const fetchDonations = useCallback(async (allCitiesOverride) => {
     setLoading(true);
     try {
-      const res = await api.get('/aahar/admin/getFoodInfoByCity');
+      const showAll = typeof allCitiesOverride === 'boolean' ? allCitiesOverride : viewAllCitiesRef.current;
+      const res = await api.get(`/aahar/admin/getFoodInfoByCity?viewAll=${showAll}`);
       setDonations(res.data?.foodInfo || []);
       const statsRes = await api.get('/aahar/stats/getStats');
       setStats(statsRes.data?.data || statsRes.data);
     } catch { showToast('Failed to load donations', 'error'); }
     finally { setLoading(false); }
   }, []);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    let active = true;
+    const load = async () => {
+      // Yield to the microtask queue to run asynchronously and avoid cascading renders
+      await Promise.resolve();
+      if (!active) return;
+      fetchDonations(viewAllCities);
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [viewAllCities, fetchDonations]);
 
   const fetchNgos = useCallback(async () => {
     setLoading(true);
@@ -1389,7 +1415,7 @@ export default function AdminDashboard() {
 
         {/* ─── DONATIONS ─── */}
         {tab === 'donations' && (
-          <div className="dashboard-section" style={{ animation: 'fadeInUp 0.3s ease' }}>
+          <div className="dashboard-section" style={{ animation: 'fadeInUp 0.35s ease' }}>
             <div className="filter-bar">
               {['all', 'pending', 'approved', 'rejected', 'done'].map(f => (
                 <button key={f} className={`filter-btn ${donationFilter === f ? 'filter-btn--active' : ''}`} onClick={() => setDonationFilter(f)}>
@@ -1406,9 +1432,26 @@ export default function AdminDashboard() {
                   )}
                 </button>
               ))}
-              <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {filteredDonations.length} result{filteredDonations.length !== 1 ? 's' : ''}
-              </span>
+              
+              {/* City Scope Selector */}
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>City Scope:</span>
+                <select
+                  value={viewAllCities ? 'all' : 'my-city'}
+                  onChange={e => {
+                    const val = e.target.value === 'all';
+                    setViewAllCities(val);
+                  }}
+                  className="form-input"
+                  style={{ width: 180, padding: '4px 8px', fontSize: '0.8rem', marginBottom: 0 }}
+                >
+                  <option value="all">🌍 All Cities</option>
+                  <option value="my-city">🏙️ My City ({user?.city || 'Local'})</option>
+                </select>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  {filteredDonations.length} result{filteredDonations.length !== 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
 
             {loading ? (
@@ -1685,6 +1728,7 @@ export default function AdminDashboard() {
                           <ActionBtn icon="🔍" label="Full Review" onClick={() => setReviewDonation(d)} />
                           {d.status === 'pending' && (
                             <>
+                              {/* eslint-disable-next-line react-hooks/refs */}
                               <ActionBtn icon="✅" label="Approve" onClick={() => approveDonation(d._id)} variant="teal" />
                               <ActionBtn icon="✕" label="Reject" onClick={() => setRejectModal(d._id)} variant="danger" />
                             </>
@@ -2557,11 +2601,14 @@ export default function AdminDashboard() {
                               </div>
                             );
                           } else {
+                            const isDone = ['done', 'completed', 'fulfilled', 'verified'].includes((tokenResult.donation.status || '').toLowerCase());
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 100, border: '1px dashed var(--border-color)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
-                                <span style={{ fontSize: '1.25rem', marginBottom: 4 }}>🎁</span>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>General Donation</div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Awaiting claim/pickup by an approved NGO</div>
+                                <span style={{ fontSize: '1.25rem', marginBottom: 4 }}>{isDone ? '🏢' : '🎁'}</span>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{isDone ? 'AAHAAR Platform' : 'General Donation'}</div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                  {isDone ? 'Food was collected & distributed directly by Aahaar volunteers.' : 'Awaiting claim/pickup by an approved NGO'}
+                                </div>
                               </div>
                             );
                           }

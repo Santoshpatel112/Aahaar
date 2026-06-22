@@ -98,21 +98,38 @@ Aahaar simplifies social responsibility by offering tangible tax savings to veri
 
 ![One Platform Double the Value](images/tax_benefits.png)
 
-### 1. Standardized Food Tax Valuation Index (₹45.00/kg)
-To prevent speculative valuations and ensure audit consistency, Aahaar implements a standardized valuation rate of **₹45.00 per kg** for rescued food. The tax exemption amount is computed as:
-$$\text{Tax Exemption Value (₹)} = \text{Food Rescued (kg)} \times 45.00$$
+### 1. 50% Tax Exemption Benefit
+To comply with the strict legal guidelines of Section 80G of the Indian Income Tax Act, 1961, Aahaar calculates the tax exemption benefit as exactly **50% of the estimated food donation value** across all categories:
+$$\text{Tax Exemption Benefit (₹)} = \text{Total Donation Value (₹)} \times 0.50$$
 
-### 2. Audit Reference System
-Every certificate is issued with a unique, audit-ready reference code (e.g., `AH-80G-[Transactions]-[Kilograms]`) that directly links the tax deduction to the underlying verified transactions. For example, `AH-80G-17-2625` indicates 17 successfully verified transactions representing 2,625 kg of rescued food, verifying the exact audit trail.
+### 2. Itemized Food Valuation Index
+Category-based base rates are applied to calculate the total donation value, adjusting for custom weights and volumes (e.g. converting grams/milliliters to standard kilograms/liters).
+
+### 3. Premium Redesigned PDF Receipts
+Every completed donation generates an official tax exemption certificate featuring premium brand details:
+* **Circular Logo Frame**: The logo is clipped inside a perfect circle mask with matching orange borders.
+* **AAHAAR Brand Heading**: Clear, bold brand presentation.
+* **Large Diagonal Watermark**: Featuring a translucent, rotated background watermark reading **"AAHAAR"** to prevent duplicate usage.
+* **Circular Verification Stamp**: A rotated, green circular ink stamp ("AAHAAR VERIFIED 80G COMPLIANT") applied to signature blocks to represent authorized verification.
+* **On-the-Fly Verification QR**: Decodes directly to formatted text showing transaction timestamps, donor PAN, verified status, and itemized valuation summaries.
 
 ---
 
-## 🛡️ Two-Stage Verification & Decentralized Sync
+## 🛡️ Identity Verification & Receipt Locks
 
-To prevent fraudulent claims, the platform implements a strict two-stage verification handshake:
+To prevent fraud and comply with tax auditing, Aahaar uses a verification framework:
+1. **Aadhaar Verification**: Donors submit Aadhaar documents to unlock standard donation portals.
+2. **PAN Card Document Verification**: Donors must submit both their 10-character PAN number and upload a verification document (PDF/Image). This submits a verification request to the Admin Panel.
+3. **Admin Verification Panel**: Admins review PAN documents directly in the **Users** tab of the Admin Panel, either approving or rejecting requests (specifying rejection reasons).
+4. **Receipt Download Gate**: Section 80G tax benefit receipt downloads are strictly locked. Donors cannot download certificates unless their PAN card verification has been approved by an administrator.
+
+---
+
+## 🔄 Logistics Verification & Decentralized Sync
+
+To prevent fraudulent claims, the platform implements a strict verification handshake:
 1. **Stage 1 (Admin Acceptance)**: When an administrator accepts the NGO's claim, a secure 6-digit verification code and a corresponding QR code containing a JSON payload with the unique tracking `token` are generated.
 2. **Stage 2 (NGO Pickup & On-Chain Sync)**: Once the food is physically verified, scanning the QR code or entering the token updates the status to `COMPLETED` on the backend and triggers reputation updates on the blockchain. If the digital verification fails, the administrator can perform a secure off-chain bypass to force-mark the request as completed, ensuring operational robustness.
-
 
 ---
 
