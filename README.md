@@ -8,6 +8,7 @@
   <a href="#-features">Features</a> •
   <a href="#-system-architecture">Architecture</a> •
   <a href="#-functional-workflows">Workflows</a> •
+  <a href="#-smart-contracts--blockchain-governance">Blockchain Governance</a> •
   <a href="#-section-80g-tax-exemption">Tax Exemption</a> •
   <a href="#-tech-stack">Tech Stack</a> •
   <a href="#-getting-started">Getting Started</a> •
@@ -30,6 +31,7 @@
 * **Automated Exemption Module**: Built-in 80G tax benefit calculation and certificate generation.
 * **Location-based Routing**: Matches surplus food listings with nearest certified NGOs.
 * **Analytical Dashboards**: Aggregates weekly, monthly, and yearly statistics (meals served, active partners, total weight).
+* **Decentralized Trust & DAO Governance**: Multi-sig/DAO mechanism to vote on NGO credentials, on-chain donation tracking, and a live web3 reputation system.
 
 ---
 
@@ -133,13 +135,51 @@ To prevent fraudulent claims, the platform implements a strict verification hand
 
 ---
 
+## ⛓️ Smart Contracts & Blockchain Governance
+
+Aahaar integrates an EVM-compatible decentralized trust and governance layer utilizing Solidity smart contracts managed via Hardhat. This establishes on-chain accountability, transparent peer-voting for onboarding, and automated reputation scoring.
+
+### 1. Smart Contract Suite
+
+* **`ReputationSystem.sol`**: Manages reputation points for both donors and NGOs. Deployed as a UUPS Upgradeable proxy. Only authorized contracts can increment or decrement reputation (e.g., +50 points to donors and +30 to NGOs upon completed donation verification, and +100 to NGOs on initial successful onboarding verification).
+* **`NGORegistry.sol`**: Stores NGO names, IPFS CIDs of documentation, and verification status. Interfaces directly with `ReputationSystem` to track historical registry credentials.
+* **`DonationRequest.sol`**: Enforces that only verified NGOs can broadcast food requests on-chain. Tracks food details, targeted quantities, cities, and request lifecycles.
+* **`Donation.sol`**: Orchestrates state transitions of donation claims (`Accepted -> PickedUp -> Delivered -> Verified`). Upon successful delivery verification by the claiming NGO or an administrator, it calls `ReputationSystem` to award points.
+* **`AahaarDAO.sol`**: Governs peer onboarding and removal of NGOs. Verified NGOs or administrators create proposals (`Onboard` or `Remove`). Other verified NGOs cast votes, and if a proposal passes, the DAO executes the action and updates the `NGORegistry` status.
+
+### 2. Hybrid Blockchain-Database Sync Architecture
+
+The system coordinates off-chain performance (MongoDB) and on-chain immutability (Smart Contracts) through an asynchronous event listener pipeline:
+
+```mermaid
+flowchart TD
+    %% Define Nodes
+    D[Donor / NGO Client] -->|Triggers Web3 TX| SC[Smart Contracts EVM]
+    SC -->|Emits Contract Events| L[Backend Event Listeners]
+    L -->|Update DB Caches| DB[(MongoDB Database)]
+    L -->|Send Push Notification| FCM[FCM / Socket.io App Alerts]
+    
+    %% Style Blocks
+    style D fill:#e6f5ff,stroke:#0066cc,stroke-width:2px
+    style SC fill:#fff2e6,stroke:#ff6600,stroke-width:2px
+    style L fill:#f2e6ff,stroke:#6600cc,stroke-width:2px
+    style DB fill:#e6ffe6,stroke:#00cc00,stroke-width:2px
+    style FCM fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
+```
+
+* **Live Event Syncing**: The Node.js backend runs dedicated listeners (`listeners.js`) that intercept Solidity events (`NGORegistered`, `NGOVerified`, `NGORejected`, `DonationRequestCreated`, `DonationAccepted`, `DonationDelivered`, `DonationVerified`).
+* **Fault-Tolerant Cache**: The database maintains a mirror of contract states. If the blockchain network is delayed, the app performs optimistic UI updates and updates the local state cache as soon as events are parsed.
+
+---
+
 ## 🛠 Tech Stack
 
 | Layer | Technologies Used |
 | :--- | :--- |
-| **Frontend** | React.js, Redux (State Management), Material-UI (UI Library), Axios (API Client) |
-| **Backend** | Node.js, Express.js (REST APIs), JWT (Authentication) |
-| **Database & Storage** | MongoDB with Mongoose (Schemas & Queries), AWS S3 (Secure Document Hosting) |
+| **Frontend** | React.js, Redux (State Management), Material-UI (UI Library), Axios (API Client), Ethers.js (Web3 interaction) |
+| **Backend** | Node.js, Express.js (REST APIs), JWT (Authentication), Ethers.js (Smart Contract listeners & execution) |
+| **Database & Storage** | MongoDB with Mongoose (Schemas & Queries), AWS S3 (Secure Document Hosting), IPFS (Decentralized proof storage) |
+| **Smart Contracts** | Solidity, Hardhat, Ethers.js, OpenZeppelin Upgradeable (UUPS proxy pattern) |
 
 ---
 
@@ -148,6 +188,7 @@ To prevent fraudulent claims, the platform implements a strict verification hand
 ```
 Aahaar/
 ├── 📁 backend/
+│   ├── 📁 blockchain/          # Blockchain listeners, contract instances, and DAO services
 │   ├── 📁 controllers/         # Logic handlers for users, stats, NGOs, tax, admin
 │   ├── 📁 middlewares/         # Auth verification, role checkers, async wrappers
 │   ├── 📁 models/              # Mongoose database schemas
@@ -157,15 +198,41 @@ Aahaar/
 │   └── 📄 s3Config.js          # AWS S3 integration
 ├── 📁 frontend/
 │   ├── 📁 src/
+│   │   ├── 📁 blockchain/      # Deployed smart contract ABIs and configurations
 │   │   ├── 📁 components/      # Chatbot, Navbar, and layout widgets
 │   │   ├── 📁 pages/           # Admin, Donor, NGO Dashboards, and landing views
 │   │   └── 📄 main.jsx         # Vite react entry point
+├── 📁 hardhat/
+│   ├── 📁 contracts/           # Solidity smart contracts (DAO, Registry, Donation, Reputation)
+│   ├── 📁 scripts/             # Contract deployment and upgrade scripts
+│   ├── 📁 test/                # Local network unit tests for smart contracts
+│   └── 📄 hardhat.config.js    # Hardhat configuration (Localhost & Amoy networks)
 └── 📁 images/                  # Platform screenshot assets
 ```
 
 ---
 
 ## 🚀 Getting Started
+
+### Blockchain & Smart Contract Setup
+1. Navigate to the hardhat directory:
+   ```bash
+   cd hardhat
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start a local Hardhat node in a separate terminal window:
+   ```bash
+   npx hardhat node
+   ```
+   *(This boots up a local EVM RPC server at `http://127.0.0.1:8545` with chain ID `1337` and generates 20 pre-funded test accounts)*
+4. In another terminal window, deploy the smart contracts to the localhost network:
+   ```bash
+   npx hardhat run scripts/deploy.js --network localhost
+   ```
+   *(This deploys UUPS upgradeable proxies, configures default roles, and writes the deployment addresses/ABIs to `backend/blockchain/contract-details.json` and `frontend/src/blockchain/contract-details.json`)*
 
 ### Backend Setup
 1. Navigate to the backend directory:
@@ -184,6 +251,10 @@ Aahaar/
    AWS_ACCESS_KEY_ID=your_aws_access_key
    AWS_SECRET_ACCESS_KEY=your_aws_secret_key
    AWS_BUCKET_NAME=your_s3_bucket_name
+   
+   # Blockchain configs (defaults to Hardhat local)
+   POLYGON_AMOY_RPC_URL=http://127.0.0.1:8545
+   BACKEND_WALLET_PRIVATE_KEY=your_local_hardhat_first_account_private_key
    ```
 4. Run the development server:
    ```bash
