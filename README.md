@@ -9,7 +9,9 @@
   <a href="#-system-architecture">Architecture</a> •
   <a href="#-functional-workflows">Workflows</a> •
   <a href="#-smart-contracts--blockchain-governance">Blockchain Governance</a> •
-  <a href="#-section-80g-tax-exemption">Tax Exemption</a> •
+  <a href="#-section-80g-tax-exemption--pdf-receipt-engine">Tax Exemption & PDF Receipt Engine</a> •
+  <a href="#-multi-channel-notification-engine">Notification Engine</a> •
+  <a href="#-global-sdg-alignment--social-impact-framework">SDG & Social Impact</a> •
   <a href="#-tech-stack">Tech Stack</a> •
   <a href="#-getting-started">Getting Started</a> •
   <a href="#-api-endpoints">API Endpoints</a>
@@ -32,6 +34,8 @@
 * **Location-based Routing**: Matches surplus food listings with nearest certified NGOs.
 * **Analytical Dashboards**: Aggregates weekly, monthly, and yearly statistics (meals served, active partners, total weight).
 * **Decentralized Trust & DAO Governance**: Multi-sig/DAO mechanism to vote on NGO credentials, on-chain donation tracking, and a live web3 reputation system.
+* **Cryptographic Handshake & QR Codes**: Dynamic verification QR codes for physical hand-off authentication and receipts verification.
+* **Omni-channel Alerts**: Socket.io (live dashboards), FCM push notifications (mobile/background), SMS, and transactional email routing.
 
 ---
 
@@ -94,6 +98,16 @@ $$\text{Meals Distributed} = \text{Food Rescued (kg)} \times 2$$
 
 ---
 
+## 🌍 Global SDG Alignment & Social Impact Framework
+
+Aahaar's surplus food rescue and redistribution pipelines directly address key United Nations Sustainable Development Goals (SDGs), converting environmental metrics into direct humanitarian impact:
+
+* **SDG 2: Zero Hunger**: By bridging the gap between food donors (commercial kitchens, banquets, and supermarkets) and verified local NGOs, Aahaar redirects edible surplus food to underserved populations in real-time, tracked via a **1 kg = 2 nutritious meals** conversion factor.
+* **SDG 12: Responsible Consumption and Production**: Aahaar tackles supply-chain food loss and waste by enforcing transparent logistic coordination. It prevents valuable nutritional resources from going to waste, encouraging commercial organizations to adopt circular economy practices and optimize resource allocation.
+* **SDG 13: Climate Action**: Methane emission from landfill food waste is a major contributor to global warming. By diverting surplus food, Aahaar avoids anaerobic decay and reduces greenhouse gas emissions (estimated via a factor of **2.5 kg CO₂ offset per kg of food saved** and mapped to tree absorption equivalents at **22 kg CO₂/tree/year**).
+
+---
+
 ## 🧾 Section 80G Tax Exemption & Valuation Engine
 
 Aahaar simplifies social responsibility by offering tangible tax savings to verified donors under Section 80G.
@@ -107,13 +121,15 @@ $$\text{Tax Exemption Benefit (₹)} = \text{Total Donation Value (₹)} \times 
 ### 2. Itemized Food Valuation Index
 Category-based base rates are applied to calculate the total donation value, adjusting for custom weights and volumes (e.g. converting grams/milliliters to standard kilograms/liters).
 
-### 3. Premium Redesigned PDF Receipts
-Every completed donation generates an official tax exemption certificate featuring premium brand details:
-* **Circular Logo Frame**: The logo is clipped inside a perfect circle mask with matching orange borders.
-* **AAHAAR Brand Heading**: Clear, bold brand presentation.
-* **Large Diagonal Watermark**: Featuring a translucent, rotated background watermark reading **"AAHAAR"** to prevent duplicate usage.
-* **Circular Verification Stamp**: A rotated, green circular ink stamp ("AAHAAR VERIFIED 80G COMPLIANT") applied to signature blocks to represent authorized verification.
-* **On-the-Fly Verification QR**: Decodes directly to formatted text showing transaction timestamps, donor PAN, verified status, and itemized valuation summaries.
+### 3. Premium Redesigned PDF Receipt Engine
+
+Upon successful on-chain verification, donors can download a legally compliant PDF tax exemption certificate. The document is dynamically compiled using `pdfkit` (located in [pdfGenerator.js](file:///Users/santoshpatel/Aahaar/backend/utils/pdfGenerator.js)) and features advanced design elements to prevent forgery and duplication:
+
+* **High-Fidelity Branding & Circular Clip**: The official Aahaar logo is clipped inside a vector-drawn circular mask utilizing a custom border radius with orange accents.
+* **Translucent Watermark Layer**: A rotated background watermark reading **"AAHAAR"** is rendered at `0.04` opacity diagonally across the page, protecting the PDF against photocopy forgery.
+* **Official Verification Stamp**: A green circular ink stamp mimicking a real verification stamp ("AAHAAR 80G COMPLIANT VERIFIED") is dynamically drawn with a `-10 degree` tilt on the signature block for authorized styling.
+* **On-the-Fly Smartphone-Scannable QR**: Pre-fetches a dynamic QR code containing the full cryptographic ledger entry (Receipt number, transaction timestamp, donor PAN, verified recipient NGO, and itemized valuation summaries). Scanning the QR code with any standard smartphone reader immediately pulls up these details, facilitating instant tax audit verification.
+* **Structured Itemized Valuation**: Automatically applies the 80G Indian Income Tax Act rules, estimating the food value by matching category base rates and listing a clear 50% tax exemption calculation alongside a digital signature frame.
 
 ---
 
@@ -127,11 +143,43 @@ To prevent fraud and comply with tax auditing, Aahaar uses a verification framew
 
 ---
 
-## 🔄 Logistics Verification & Decentralized Sync
+## 🔄 Logistics Verification & Blockchain QR Handshake
 
-To prevent fraudulent claims, the platform implements a strict verification handshake:
-1. **Stage 1 (Admin Acceptance)**: When an administrator accepts the NGO's claim, a secure 6-digit verification code and a corresponding QR code containing a JSON payload with the unique tracking `token` are generated.
-2. **Stage 2 (NGO Pickup & On-Chain Sync)**: Once the food is physically verified, scanning the QR code or entering the token updates the status to `COMPLETED` on the backend and triggers reputation updates on the blockchain. If the digital verification fails, the administrator can perform a secure off-chain bypass to force-mark the request as completed, ensuring operational robustness.
+To prevent fraudulent claims, minimize delivery disputes, and lock proof-of-delivery on-chain, Aahaar uses a secure cryptographic verification handshake:
+
+```mermaid
+sequenceDiagram
+    participant Donor
+    participant Admin
+    participant NGO
+    participant Backend
+    participant Blockchain
+
+    NGO->>Backend: Claims Surplus Food / Donation Request
+    Admin->>Backend: Approves Claims Allocation
+    Backend->>Backend: Generates 6-Digit Code & QR Token
+    Backend-->>NGO: Issues QR Code & Verification Token
+    
+    rect rgb(240, 248, 255)
+        Note over Donor, NGO: Physical Hand-off (At Pickup Location)
+        NGO->>Donor: Presents QR Code/6-Digit Code
+        Donor->>Backend: Scans QR / Enters 6-Digit Code
+    end
+
+    Backend->>Blockchain: Triggers markDelivered() / verifyDonation()
+    Blockchain->>Blockchain: Updates status to "COMPLETED" on-chain
+    Blockchain->>Blockchain: Distributes Reputation (+50 Donor, +30 NGO)
+    Blockchain-->>Backend: Emits DonationVerified Event
+    Backend->>Backend: Syncs MongoDB status cache
+    Backend->>Donor: Triggers Instant FCM & Web Socket Notifications
+```
+
+1. **Token Generation (Allocations)**: When an administrator accepts an NGO's claim to a surplus listing, the backend generates a secure 6-digit verification code and a corresponding QR code containing a signed JSON payload with a unique tracking `token`.
+2. **Physical Scan Verification**: During pickup, the NGO representative displays this QR code to the donor. The donor scans the QR code using their camera portal (or manually inputs the 6-digit code) to authenticate the physical hand-off.
+3. **On-Chain Settlement**: Submitting this verification triggers a call to the smart contract:
+   - `Donation.markDelivered(donationId, deliveryProofCID)`: Stores the IPFS hash representing the delivery proof.
+   - `Donation.verifyDonation(donationId)`: Transition states on the blockchain to `Verified` (completed) and automatically invokes the `ReputationSystem` to reward points.
+4. **Off-Chain Bypass Guarantee**: In cases of low connectivity at the pickup location, the system provides a secure administrative bypass key. An administrator can authorize an off-chain bypass to force-mark the request as completed, ensuring operational continuation while logging the administrative audit trail.
 
 ---
 
@@ -169,6 +217,31 @@ flowchart TD
 
 * **Live Event Syncing**: The Node.js backend runs dedicated listeners (`listeners.js`) that intercept Solidity events (`NGORegistered`, `NGOVerified`, `NGORejected`, `DonationRequestCreated`, `DonationAccepted`, `DonationDelivered`, `DonationVerified`).
 * **Fault-Tolerant Cache**: The database maintains a mirror of contract states. If the blockchain network is delayed, the app performs optimistic UI updates and updates the local state cache as soon as events are parsed.
+
+## 🔔 Multi-Channel Notification Engine
+
+To maintain real-time coordinator alerts across all participant roles, Aahaar uses a centralized dispatcher ([notification.service.js](file:///Users/santoshpatel/Aahaar/backend/services/notification.service.js)) that broadcasts notifications across four distinct channels:
+
+```mermaid
+flowchart LR
+    E[App Event Trigger] --> N[Notification Dispatcher]
+    N -->|Socket.io| Ch1[1. In-App Real-time Alerts]
+    N -->|FCM SDK| Ch2[2. Offline Push Notifications]
+    N -->|SMS Gateway| Ch3[3. Direct SMS Alerts]
+    N -->|Email Service| Ch4[4. Pluggable Email Alerts]
+    
+    style E fill:#fff,stroke:#333,stroke-width:2px
+    style N fill:#f97316,stroke:#ea580c,stroke-width:2px,color:#fff
+    style Ch1 fill:#e6f5ff,stroke:#0066cc,stroke-width:1px
+    style Ch2 fill:#f2e6ff,stroke:#6600cc,stroke-width:1px
+    style Ch3 fill:#e6ffe6,stroke:#00cc00,stroke-width:1px
+    style Ch4 fill:#fff2e6,stroke:#ff6600,stroke-width:1px
+```
+
+* **1. Real-Time In-App Alerts (Socket.io)**: Emitter triggers send socket messages directly to personalized rooms. Dashboards update live statistics, alert feeds, and badges dynamically without requiring page refreshes (handled in [socket.service.js](file:///Users/santoshpatel/Aahaar/backend/services/socket.service.js)).
+* **2. Offline Push Notifications (Firebase Cloud Messaging - FCM)**: If a user closes the browser or locks their phone, the FCM service compiles an APNs/FCM payload and delivers background push notifications to registered devices via the user's saved `fcmToken` (handled in [firebase.service.js](file:///Users/santoshpatel/Aahaar/backend/services/firebase.service.js)).
+* **3. Direct SMS Gateway**: Dispatched via Twilio/SMS gateway triggers, sending real-time SMS status updates (e.g., "Donation Accepted", "OTP Verification Code") directly to the participant's registered phone number (handled in [sms.service.js](file:///Users/santoshpatel/Aahaar/backend/services/sms.service.js)).
+* **4. Pluggable Email Alerts**: Sends structured HTML transaction emails detailing tax certificates, registration updates, and DAO proposal outcomes to the participant's registered email address (handled in [email.service.js](file:///Users/santoshpatel/Aahaar/backend/services/email.service.js)).
 
 ---
 
