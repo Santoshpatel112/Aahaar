@@ -127,6 +127,11 @@ export default function LandingPage() {
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [activeCsrTab, setActiveCsrTab] = useState('donations');
 
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [exemptionWeight, setExemptionWeight] = useState(100);
+  const [exemptionCategory, setExemptionCategory] = useState('Cooked Meals');
+  const [taxBracket, setTaxBracket] = useState(30);
+
   const [selectedRequestDetails, setSelectedRequestDetails] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [expectedDate, setExpectedDate] = useState('');
@@ -523,7 +528,7 @@ export default function LandingPage() {
               <button 
                 type="button"
                 className="btn-secondary" 
-                onClick={() => showToast('Coming soon! Thanks for donation.', 'info')}
+                onClick={() => setIsCalculatorOpen(true)}
                 style={{ alignSelf: 'flex-start', padding: '11px 26px', fontSize: '0.875rem', cursor: 'pointer', background: 'none' }}
               >
                 Calculate Exemption →
@@ -1240,6 +1245,175 @@ export default function LandingPage() {
           </div>
         </div>
       )}
+
+      {/* Interactive Tax Exemption & ESG Impact Calculator Modal */}
+      {isCalculatorOpen && (() => {
+        const CALCULATOR_RATES = {
+          'Cooked Meals': 45,
+          'Grains': 40,
+          'Vegetables': 25,
+          'Fruits': 60,
+          'Bakery': 70,
+          'Dairy': 50,
+          'Packaged Food': 100,
+          'Beverages': 40,
+          'Others': 30
+        };
+        const rate = CALCULATOR_RATES[exemptionCategory] || 30;
+        const fairMarketValue = exemptionWeight * rate;
+        const taxExemptionClaim = fairMarketValue * 0.50; // 50% under Section 80G
+        const netCashSavings = taxExemptionClaim * (taxBracket / 100);
+        const carbonSaved = exemptionWeight * 2.5;
+        const treeEquivalent = Math.round((carbonSaved / 22) * 10) / 10;
+        const mealsServed = exemptionWeight * 2;
+
+        return (
+          <div className="modal-overlay" onClick={() => setIsCalculatorOpen(false)} style={{ zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 650, padding: 32, background: 'rgba(17,24,39,0.98)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-xl)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', width: '90%' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid var(--border-color)', paddingBottom: 16 }}>
+                <h3 className="modal__title" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                  💰 Enterprise Tax & ESG Impact Calculator
+                </h3>
+                <button onClick={() => setIsCalculatorOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.5rem', cursor: 'pointer', outline: 'none' }}>×</button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24, textAlign: 'left' }}>
+                
+                {/* Inputs Column */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div>
+                    <label className="form-label" style={{ color: 'var(--text-secondary)', marginBottom: 6, fontSize: '0.85rem', display: 'block' }}>1. Select Food Category</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                      {Object.keys(CALCULATOR_RATES).map((cat) => {
+                        const isSelected = exemptionCategory === cat;
+                        const icons = { 'Cooked Meals': '🍱', 'Grains': '🌾', 'Vegetables': '🥦', 'Fruits': '🍎', 'Bakery': '🍞', 'Dairy': '🥛', 'Packaged Food': '🫙', 'Beverages': '🧃', 'Others': '🥘' };
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setExemptionCategory(cat)}
+                            style={{
+                              padding: '8px 4px',
+                              borderRadius: '8px',
+                              border: isSelected ? '1px solid var(--color-orange)' : '1px solid var(--border-color)',
+                              background: isSelected ? 'rgba(249,115,22,0.1)' : 'rgba(255,255,255,0.02)',
+                              color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              fontSize: '0.78rem',
+                              textAlign: 'center',
+                              fontWeight: isSelected ? '700' : 'normal',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <span style={{ display: 'block', fontSize: '1.2rem', marginBottom: 2 }}>{icons[cat] || '🥘'}</span>
+                            {cat}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>2. Donation Weight</label>
+                      <span style={{ fontWeight: 800, color: 'var(--color-orange)', fontSize: '0.9rem' }}>{exemptionWeight} kg</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="2000" 
+                      step="10"
+                      value={exemptionWeight} 
+                      onChange={(e) => setExemptionWeight(Number(e.target.value))}
+                      style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--color-orange)' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                      <span>10 kg</span>
+                      <span>500 kg</span>
+                      <span>1000 kg</span>
+                      <span>2000 kg</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ color: 'var(--text-secondary)', marginBottom: 6, fontSize: '0.85rem', display: 'block' }}>3. Tax Bracket (Corporate/Individual)</label>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      {[10, 20, 30, 34.94].map((bracket) => {
+                        const isSelected = taxBracket === bracket;
+                        return (
+                          <button
+                            key={bracket}
+                            type="button"
+                            onClick={() => setTaxBracket(bracket)}
+                            style={{
+                              flex: 1,
+                              padding: '8px 0',
+                              borderRadius: '8px',
+                              border: isSelected ? '1px solid var(--color-teal)' : '1px solid var(--border-color)',
+                              background: isSelected ? 'rgba(6,182,212,0.1)' : 'rgba(255,255,255,0.02)',
+                              color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              fontWeight: isSelected ? '700' : 'normal'
+                            }}
+                          >
+                            {bracket}%
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>* 30% is standard for Indian companies, 34.94% for high corporate brackets.</span>
+                  </div>
+                </div>
+
+                {/* Outputs Column */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, background: 'rgba(255,255,255,0.02)', padding: 18, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '1rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: 8 }}>Estimated Benefits</h4>
+                  
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Estimated Food Market Value</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-primary)', marginTop: 2 }}>₹{fairMarketValue.toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Valued at base rate of ₹{rate}/kg</div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Section 80G Claimable Deduction</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--color-orange)', marginTop: 2 }}>₹{taxExemptionClaim.toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>50% of Fair Market Value exempted</div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Actual Tax Cash Savings (Net)</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.45rem', color: 'var(--color-teal)', marginTop: 2 }}>₹{Math.round(netCashSavings).toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Direct deduction in tax payable liability</div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CO₂ Saved</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#60a5fa' }}>🌱 {carbonSaved} kg</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Meals Served</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#eab308' }}>🍽️ {mealsServed} meals</div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+                <button type="button" className="btn-ghost" onClick={() => setIsCalculatorOpen(false)} style={{ padding: '8px 20px', cursor: 'pointer' }}>Close</button>
+                <Link to="/login" className="btn-primary" style={{ border: 'none', color: '#fff', padding: '8px 20px', textDecoration: 'none', fontSize: '0.875rem', borderRadius: 'var(--radius-md)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  Start Donating & Save →
+                </Link>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
