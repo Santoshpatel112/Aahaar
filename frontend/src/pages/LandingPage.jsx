@@ -37,7 +37,7 @@ const FAQ = [
   { q: 'Is there a minimum donation amount?', a: 'No minimum. Even a small quantity of food can make a difference. All categories and quantities are welcome.' },
   { q: 'How quickly is a donation collected?', a: 'Once your donation is approved, an NGO in your city is notified and will typically coordinate pickup within 24–48 hours.' },
   { q: 'How is the Carbon Reduction (ESG offset) calculated?', a: 'Redirecting food waste from landfills avoids anaerobic decomposition that releases methane (a greenhouse gas 25x more potent than CO₂). Diverting surplus food generates a certified ESG offset of 2.5 kg CO₂ equivalents per kilogram of food saved.' },
-  { q: 'How is the 80G Tax Exemption valuation calculated?', a: 'For tax filing compliance, surplus food donations are valued at a standard rate of ₹45.00 per kilogram. This rate generates certified 80G tax benefit certificates directly claimable by corporate and individual enterprise partners.' },
+  { q: 'How is the 80G Tax Exemption valuation calculated?', a: 'Under Section 80G of the Income Tax Act, direct in-kind/physical food donations are not eligible for tax deductions. However, donors can claim a tax exemption by making a monetary donation to sponsor the sourcing & distribution of food via our 80G-registered NGO partners. For calculations, we use standard procurement rates per category (e.g. ₹40/kg for Grains). Sponsoring 1,000 kg of Grains costs ₹40,000. Under Section 80G(5), 50% of this monetary donation (₹20,000) is a claimable deduction. At a 30% corporate tax bracket, this yields ₹6,000 in net tax savings (applicable only under the Old Tax Regime and subject to the 10% Adjusted Gross Income qualifying limit).' },
   { q: 'How does the blockchain ledger verification work?', a: 'Aahaar logs all verification milestones (donation commits, NGO collections, delivery timestamps) onto the Polygon blockchain. This establishes an immutable, cryptographic audit receipt validating your corporate ESG claims.' },
 ];
 
@@ -193,7 +193,7 @@ export default function LandingPage() {
       })
       .catch(err => console.error('Error fetching active requests:', err))
       .finally(() => setLoadingRequests(false));
-  }, []);
+  }, [user]);
 
   const totalDonations = stats.totalDonations;
   const mealsServed = stats.mealsServed;
@@ -1155,8 +1155,9 @@ export default function LandingPage() {
               /* Inline date picker view */
               <form onSubmit={handleAcceptRequestInline} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
                 <div className="form-group" style={{ textAlign: 'left' }}>
-                  <label className="form-label" style={{ color: 'var(--text-secondary)' }}>Expected Delivery Date & Time *</label>
+                  <label htmlFor="expected-delivery-date" className="form-label" style={{ color: 'var(--text-secondary)' }}>Expected Delivery Date & Time *</label>
                   <input 
+                    id="expected-delivery-date"
                     type="datetime-local"
                     className="form-input"
                     value={expectedDate}
@@ -1260,8 +1261,8 @@ export default function LandingPage() {
           'Others': 30
         };
         const rate = CALCULATOR_RATES[exemptionCategory] || 30;
-        const fairMarketValue = exemptionWeight * rate;
-        const taxExemptionClaim = fairMarketValue * 0.50; // 50% under Section 80G
+        const sponsorshipAmount = exemptionWeight * rate;
+        const taxExemptionClaim = sponsorshipAmount * 0.50; // 50% under Section 80G
         const netCashSavings = taxExemptionClaim * (taxBracket / 100);
         const carbonSaved = exemptionWeight * 2.5;
         const treeEquivalent = Math.round((carbonSaved / 22) * 10) / 10;
@@ -1275,7 +1276,7 @@ export default function LandingPage() {
                 <h3 className="modal__title" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
                   💰 Enterprise Tax & ESG Impact Calculator
                 </h3>
-                <button onClick={() => setIsCalculatorOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.5rem', cursor: 'pointer', outline: 'none' }}>×</button>
+                <button onClick={() => setIsCalculatorOpen(false)} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.5rem', cursor: 'pointer', outline: 'none' }}>×</button>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24, textAlign: 'left' }}>
@@ -1316,10 +1317,11 @@ export default function LandingPage() {
 
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>2. Donation Weight</label>
+                      <label htmlFor="exemption-weight-slider" className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>2. Donation Weight</label>
                       <span style={{ fontWeight: 800, color: 'var(--color-orange)', fontSize: '0.9rem' }}>{exemptionWeight} kg</span>
                     </div>
                     <input 
+                      id="exemption-weight-slider"
                       type="range" 
                       min="10" 
                       max="2000" 
@@ -1372,21 +1374,21 @@ export default function LandingPage() {
                   <h4 style={{ margin: '0 0 6px', fontSize: '1rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: 8 }}>Estimated Benefits</h4>
                   
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Estimated Food Market Value</div>
-                    <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-primary)', marginTop: 2 }}>₹{fairMarketValue.toLocaleString('en-IN')}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Valued at base rate of ₹{rate}/kg</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sponsorship/Sourcing Cost</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-primary)', marginTop: 2 }}>₹{sponsorshipAmount.toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Sourcing rate valued at ₹{rate}/kg</div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Section 80G Claimable Deduction</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Section 80G Deduction (50%)</div>
                     <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--color-orange)', marginTop: 2 }}>₹{taxExemptionClaim.toLocaleString('en-IN')}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>50% of Fair Market Value exempted</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>50% of sponsored sourcing cost claimable</div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Actual Tax Cash Savings (Net)</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Net Income Tax Savings</div>
                     <div style={{ fontWeight: 800, fontSize: '1.45rem', color: 'var(--color-teal)', marginTop: 2 }}>₹{Math.round(netCashSavings).toLocaleString('en-IN')}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Direct deduction in tax payable liability</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Based on your selected {taxBracket}% tax bracket</div>
                   </div>
 
                   <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
@@ -1405,6 +1407,11 @@ export default function LandingPage() {
                   </div>
                 </div>
 
+              </div>
+
+              {/* Legal disclaimer for Section 80G */}
+              <div style={{ marginTop: 18, padding: '12px 16px', background: 'rgba(234,179,8,0.04)', border: '1px dashed rgba(234,179,8,0.2)', borderRadius: 8, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                <strong>⚠️ Section 80G Compliance Notice:</strong> Under Indian Income Tax law, direct physical (in-kind) donations of food do not qualify for 80G tax deductions. To claim this tax benefit, corporate or individual donors must make a <strong>monetary donation to sponsor the sourcing/procurement</strong> of these food items through our 80G-registered NGO partners. Deductions are capped at 10% of your Adjusted Gross Total Income under the Old Tax Regime.
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>

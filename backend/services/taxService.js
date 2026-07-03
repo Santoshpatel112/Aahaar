@@ -1,6 +1,6 @@
 import Tax from "../models/taxModel.js";
 import User from "../models/userModel.js";
-import { generateDonationReceipt } from "../utils/pdfGenerator.js";
+import { generateDonationReceipt, generateTaxExemptionGuide } from "../utils/pdfGenerator.js";
 import { sendDonationReceiptEmail } from "../utils/emailHelper.js";
 import { notify } from "./notification.service.js";
 
@@ -114,12 +114,13 @@ export const generateAndEmailReceipt = async (donation) => {
     // Calculate tax exemption and save
     const taxExemption = await calculateAndCreateTaxExemption(donation, donorId);
 
-    // Generate PDF
+    // Generate PDFs
     const pdfBuffer = await generateDonationReceipt(donation, donor, taxExemption);
+    const guidePdfBuffer = await generateTaxExemptionGuide(donor);
     const receiptNo = taxExemption.certificateNumber || `AHR-${donation._id.toString().slice(-6).toUpperCase()}`;
 
     // Send Email
-    const emailSent = await sendDonationReceiptEmail(donor.email, pdfBuffer, receiptNo);
+    const emailSent = await sendDonationReceiptEmail(donor.email, pdfBuffer, receiptNo, guidePdfBuffer);
 
     if (emailSent) {
       taxExemption.certificateIssued = true;

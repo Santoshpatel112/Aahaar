@@ -10,14 +10,18 @@ import path from "path";
  */
 export const sendOTPEmail = async (email, otp) => {
   const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
   const clientId = process.env.GOOGLE_CLINT_ID;
   const clientSecret = process.env.GOOGLE_CLINT_SECRATE_ID;
   const refreshToken = process.env.GOOGLE_REFRESS_TOKEN;
 
-  if (!emailUser || !clientId || !clientSecret || !refreshToken) {
+  const hasOAuth2 = emailUser && clientId && clientSecret && refreshToken;
+  const hasAppPassword = emailUser && emailPass;
+
+  if (!hasOAuth2 && !hasAppPassword) {
     console.log("\n==============================================");
     console.log(`📧 [EMAIL MOCK / LOCAL DEV]`);
-    console.log(`OAuth2 environment variables (EMAIL_USER, GOOGLE_CLINT_ID, etc.) not fully set.`);
+    console.log(`Email credentials not fully set (EMAIL_PASS or OAuth2 variables).`);
     console.log(`Recipient: ${email}`);
     console.log(`Your Aahaar Verification OTP is: ${otp}`);
     console.log("==============================================\n");
@@ -27,7 +31,10 @@ export const sendOTPEmail = async (email, otp) => {
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
-      auth: {
+      auth: hasAppPassword ? {
+        user: emailUser,
+        pass: emailPass
+      } : {
         type: 'OAuth2',
         user: emailUser,
         clientId: clientId,
@@ -73,13 +80,17 @@ export const sendOTPEmail = async (email, otp) => {
  * @param {Buffer} pdfBuffer - The PDF data
  * @param {string} receiptNo - The receipt number (e.g. AHR-XXXXXX)
  */
-export const sendDonationReceiptEmail = async (email, pdfBuffer, receiptNo) => {
+export const sendDonationReceiptEmail = async (email, pdfBuffer, receiptNo, guidePdfBuffer) => {
   const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
   const clientId = process.env.GOOGLE_CLINT_ID;
   const clientSecret = process.env.GOOGLE_CLINT_SECRATE_ID;
   const refreshToken = process.env.GOOGLE_REFRESS_TOKEN;
 
-  if (!emailUser || !clientId || !clientSecret || !refreshToken) {
+  const hasOAuth2 = emailUser && clientId && clientSecret && refreshToken;
+  const hasAppPassword = emailUser && emailPass;
+
+  if (!hasOAuth2 && !hasAppPassword) {
     // Local dev file saving fallback
     try {
       const receiptsDir = path.join(path.resolve(), 'uploads', 'receipts');
@@ -89,10 +100,18 @@ export const sendDonationReceiptEmail = async (email, pdfBuffer, receiptNo) => {
       const localFilePath = path.join(receiptsDir, `Donation_Receipt_${receiptNo}.pdf`);
       fs.writeFileSync(localFilePath, pdfBuffer);
 
+      if (guidePdfBuffer) {
+        const localGuidePath = path.join(receiptsDir, `Aahaar_Section_80G_Tax_Exemption_Guide.pdf`);
+        fs.writeFileSync(localGuidePath, guidePdfBuffer);
+      }
+
       console.log("\n==============================================");
       console.log(`📧 [EMAIL MOCK / LOCAL DEV]`);
-      console.log(`OAuth2 credentials not configured.`);
+      console.log(`Email credentials not configured.`);
       console.log(`Saved receipt PDF locally to: ${localFilePath}`);
+      if (guidePdfBuffer) {
+        console.log(`Saved tax guide PDF locally to: ${path.join(receiptsDir, 'Aahaar_Section_80G_Tax_Exemption_Guide.pdf')}`);
+      }
       console.log(`Recipient: ${email}`);
       console.log("==============================================\n");
     } catch (fsErr) {
@@ -104,7 +123,10 @@ export const sendDonationReceiptEmail = async (email, pdfBuffer, receiptNo) => {
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
-      auth: {
+      auth: hasAppPassword ? {
+        user: emailUser,
+        pass: emailPass
+      } : {
         type: 'OAuth2',
         user: emailUser,
         clientId: clientId,
@@ -117,15 +139,37 @@ export const sendDonationReceiptEmail = async (email, pdfBuffer, receiptNo) => {
       from: `"Aahaar Initiative" <${emailUser}>`,
       to: email,
       subject: `🌾 Aahaar Donation Receipt: ${receiptNo}`,
-      text: `Hello, thank you for your generous donation. Please find your official Section 80G tax exemption receipt attached to this email.`,
+      text: `Hello, thank you for your generous donation. Please find your official Section 80G tax exemption receipt and Tax Exemption Guide attached to this email.`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 8px;">
-          <h2 style="color: #f97316; text-align: center;">Thank You for Your Donation! 🌾</h2>
-          <p>Hello,</p>
-          <p>We are grateful for your support in fighting hunger. Your recent donation has been verified and successfully received by the NGO partner.</p>
-          <p>We have attached your official **Tax Exemption Certificate / Receipt** (PDF) to this email for your records.</p>
-          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
-          <p style="font-size: 11px; color: #888888; text-align: center;">Aahaar Initiative — One meal at a time.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #fafafa;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <span style="font-size: 40px;">🌾</span>
+            <h2 style="color: #f97316; margin: 10px 0 0; font-size: 24px; font-weight: 800;">Thank You for Your Generous Donation!</h2>
+            <p style="color: #64748b; font-size: 14px; margin: 4px 0 0;">Your contribution changes lives</p>
+          </div>
+          
+          <div style="background-color: #ffffff; padding: 24px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <p style="margin-top: 0; color: #334155; font-size: 15px; line-height: 1.6;">Hello,</p>
+            <p style="color: #334155; font-size: 15px; line-height: 1.6;">
+              We are incredibly grateful for your donation to <strong>Aahaar</strong>. Your contribution has been verified, matched, and safely delivered to our NGO partner.
+            </p>
+            <p style="color: #334155; font-size: 15px; line-height: 1.6;">
+              By redirecting this surplus food, you have fed hungry families and helped protect the environment by reducing landfill methane emissions.
+            </p>
+            
+            <div style="margin: 20px 0; padding: 16px; background-color: #f8fafc; border-left: 4px solid #f97316; border-radius: 4px;">
+              <h4 style="margin: 0 0 8px; color: #1e293b; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Attached Documents</h4>
+              <ul style="margin: 0; padding-left: 20px; color: #475569; font-size: 13.5px; line-height: 1.5;">
+                <li><strong>Donation Receipt (${receiptNo})</strong>: Your official certificate and Section 80G tax receipt.</li>
+                <li><strong>Tax Exemption Guide</strong>: A guide outlining how to claim your 50% tax deduction under Section 80G in your ITR.</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div style="text-align: center; color: #94a3b8; font-size: 12px; line-height: 1.5;">
+            <p style="margin-bottom: 4px;">Aahaar Initiative — Fighting hunger, sharing hope. One meal at a time.</p>
+            <p style="margin-top: 0;">© 2026 Aahaar. All rights reserved.</p>
+          </div>
         </div>
       `,
       attachments: [
@@ -134,6 +178,11 @@ export const sendDonationReceiptEmail = async (email, pdfBuffer, receiptNo) => {
           content: pdfBuffer,
           contentType: 'application/pdf',
         },
+        ...(guidePdfBuffer ? [{
+          filename: `Aahaar_Section_80G_Tax_Exemption_Guide.pdf`,
+          content: guidePdfBuffer,
+          contentType: 'application/pdf',
+        }] : [])
       ],
     };
 
