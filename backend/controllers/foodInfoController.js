@@ -545,7 +545,7 @@ const rejectDirectDonation = asyncHandler(async (req, res) => {
 
 const downloadDonationReceipt = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const donation = await FoodInfo.findById(id).populate('pickedUpByNgo').populate('ngoPreference');
+    const donation = await FoodInfo.findById(id).populate('pickedUpByNgo');
     if (!donation) {
         res.status(404);
         throw new Error("Donation not found");
@@ -577,11 +577,20 @@ const downloadDonationReceipt = asyncHandler(async (req, res) => {
 
     // Resolve or generate tax exemption details
     const { calculateAndCreateTaxExemption } = await import("../services/taxService.js");
-    const { generateDonationReceipt } = await import("../utils/pdfGenerator.js");
+    const { generateDonationReceipt, generateTaxExemptionGuide } = await import("../utils/pdfGenerator.js");
     const taxExemption = await calculateAndCreateTaxExemption(donation, donorId);
 
     const pdfBuffer = await generateDonationReceipt(donation, donor, taxExemption);
     const receiptNo = taxExemption.certificateNumber || `AHR-${donation._id.toString().slice(-6).toUpperCase()}`;
+
+    // Also send documents to the donor's email automatically on download click
+    try {
+        const { sendDonationReceiptEmail } = await import("../utils/emailHelper.js");
+        const guidePdfBuffer = await generateTaxExemptionGuide(donor);
+        sendDonationReceiptEmail(donor.email, pdfBuffer, receiptNo, guidePdfBuffer);
+    } catch (emailErr) {
+        console.error("Failed to auto-email receipt on download:", emailErr);
+    }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=Donation_Receipt_${receiptNo}.pdf`);

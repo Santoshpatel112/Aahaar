@@ -483,6 +483,14 @@ const verifyNgoFoodRequestFulfillment = asyncHandler(async (req, res) => {
         donation.pickedUpByNgo = ngo._id;
       }
       await donation.save();
+
+      // Trigger Section 80G PDF receipt compilation and email transmission to donor
+      try {
+        const { generateAndEmailReceipt } = await import("../services/taxService.js");
+        generateAndEmailReceipt(donation);
+      } catch (taxErr) {
+        console.error("Failed to trigger generateAndEmailReceipt in NGO complete request:", taxErr);
+      }
     }
   }
 
