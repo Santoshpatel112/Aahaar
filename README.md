@@ -25,6 +25,19 @@
 
 ---
 
+## 🌟 Why Aahaar? (Differentiation & Value Proposition)
+
+Aahaar stands apart from traditional charity channels by resolving three major bottlenecks in surplus food donation: **Trust Deficit**, **Verification Disputes**, and **Lack of Financial Incentives** for corporate contributors. 
+
+| Dimension | Traditional Food Rescue | The Aahaar Advantage |
+| :--- | :--- | :--- |
+| **Trust & Immutability** | Centralized ledgers prone to manual manipulation and reporting inflation. | **Decentralized Ledger (Polygon Blockchain)**: Every registration proposal, donor-NGO match, and delivery verification is logged on-chain. Peer DAO voting determines NGO entry. |
+| **Fulfillment Verification** | Manual receipts and paper logbooks resulting in logistics and pickup disputes. | **Cryptographic QR Handshake**: Pickups require a real-time QR scan handshake between the NGO and the donor to authenticate physical transfer. |
+| **Financial/Tax Incentive** | Direct food donations (in-kind) do not qualify for Section 80G tax deductions in India. | **Monetary Sponsoring & Valuation**: Bridges the gap by converting food weight categories into procurement costs, allowing corporate sponsors to claim a **50% Section 80G tax deduction** via 80G-registered NGO partners. |
+| **Alerts & Speed** | Delayed manual emails or messages, causing surplus food to spoil before pickup. | **Real-Time Notification Engine**: Centralized dispatcher coordinates **Socket.io** (live screen updates), **FCM** (background push), **Twilio SMS**, and **SMTP** (email receipt delivery) instantly. |
+
+---
+
 ## 🚀 Key Features
 
 * **Multi-Portal Experience**: Separate interactive dashboards for Donors, NGOs, and Administrators.
@@ -48,6 +61,36 @@ The platform features a hybrid real-time alert and background push notification 
 ---
 
 ## 🔄 Functional Workflows
+
+### Surplus Food Rescue & Verification Lifecycle
+
+The diagram below maps the complete cycle of a donation—from the initial listing by the donor, through real-time notifications, admin vetting, dynamic QR handshake verification at the pickup location, Polygon blockchain settlement, up to the automated compilation and delivery of the Section 80G tax write-off documents.
+
+```mermaid
+flowchart TD
+    %% Define Nodes
+    A[1. Donor Lists Food] -->|Weight & Category| B(2. Backend Saves Pending)
+    B -->|Socket.io Live Alert| C[3. NGOs View & Claim Allocation]
+    C -->|Admin Review| D(4. Admin Approves & Allocates)
+    D -->|Token Generation| E(5. Verification QR Code Issued to NGO)
+    E -->|Physical Pickup| F{6. Dynamic Handshake Verification}
+    F -->|Scan QR / Enter Code| G[7. Donor Authenticates Pickup]
+    G -->|Solidity TX| H[(8. Polygon Blockchain Settlement)]
+    H -->|Verified Status| I[9. Award Reputation Points]
+    H -->|Receipt Compiler| J[10. Generate Section 80G PDF & Tax Guide]
+    J -->|SMTP Email Dispatch| K[11. Documents Emailed to Donor Inbox]
+
+    %% Style Nodes
+    style A fill:#fff7ed,stroke:#f97316,stroke-width:2px
+    style E fill:#fff7ed,stroke:#f97316,stroke-width:2px
+    style F fill:#f0fbf8,stroke:#0d9488,stroke-width:2px
+    style H fill:#e6f5ff,stroke:#0066cc,stroke-width:2px
+    style J fill:#f2e6ff,stroke:#6600cc,stroke-width:2px
+    style K fill:#fff2e6,stroke:#ff6600,stroke-width:2px
+```
+
+---
+
 
 ### 1. Donor Portal (How it works & Donating)
 * **Onboarding**: Users create an account and upload their Aadhaar Card to verify donor identity.
