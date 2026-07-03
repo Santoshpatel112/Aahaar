@@ -1389,10 +1389,14 @@ export default function LandingPage() {
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Direct deduction in tax payable liability</div>
                   </div>
 
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                     <div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CO₂ Saved</div>
                       <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#60a5fa' }}>🌱 {carbonSaved} kg</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Tree Offset</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#10b981' }}>🌳 {treeEquivalent} trees</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Meals Served</div>
