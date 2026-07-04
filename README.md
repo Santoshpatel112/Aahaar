@@ -23,6 +23,9 @@
 
 ![Aahaar Landing Page](images/landing_hero.png)
 
+![Aahaar Ecosystem Mind Map](images/aahaar_mindmap_real_logo.png)
+
+
 ---
 
 ## 🌟 Why Aahaar? (Differentiation & Value Proposition)
@@ -125,6 +128,8 @@ Aahaar provides corporate donors with a high-fidelity **Corporate Social Respons
 
 ## 🌱 Environment & Sustainability Mechanics
 
+![Aahaar ESG & Carbon Offset Metrics](images/aahaar_esg_carbon.png)
+
 Aahaar converts raw food rescue statistics into actionable environmental ESG (Environmental, Social, and Governance) metrics using scientifically-backed formulas:
 
 ### 1. Landfill Methane Avoidance (Methane Offset Factor: 2.5)
@@ -152,6 +157,8 @@ Aahaar's surplus food rescue and redistribution pipelines directly address key U
 ---
 
 ## 🧾 Section 80G Tax Exemption & Valuation Engine
+
+![Aahaar Section 80G Tax Exemption](images/aahaar_tax_exemption.png)
 
 Aahaar simplifies social responsibility by offering tangible tax savings to verified donors under Section 80G.
 
@@ -187,6 +194,8 @@ To prevent fraud and comply with tax auditing, Aahaar uses a verification framew
 ---
 
 ## 🔄 Logistics Verification & Blockchain QR Handshake
+
+![Aahaar Cryptographic QR Handshake](images/aahaar_trust_handshake.png)
 
 To prevent fraudulent claims, minimize delivery disputes, and lock proof-of-delivery on-chain, Aahaar uses a secure cryptographic verification handshake:
 

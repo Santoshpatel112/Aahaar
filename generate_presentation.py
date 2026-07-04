@@ -8,18 +8,18 @@ from pptx.enum.shapes import MSO_SHAPE
 # ==========================================
 # 1. Color Palette & Typography Constants
 # ==========================================
-COLOR_DARK_BG = RGBColor(11, 19, 43)        # Deep Space Navy (for Dark Slides)
-COLOR_LIGHT_BG = RGBColor(248, 250, 252)    # Light Slate Off-White (for Content Slides)
-COLOR_PRIMARY_TEXT = RGBColor(15, 23, 42)    # Slate 900 (for Dark text on light BG)
-COLOR_MUTED_TEXT = RGBColor(71, 85, 105)     # Slate 600 (for Body text)
-COLOR_ORANGE_ACCENT = RGBColor(249, 115, 22) # Vibrant Orange (Primary Accent)
-COLOR_GREEN_ACCENT = RGBColor(16, 185, 129)  # Emerald Green (Trust Accent)
-COLOR_BLUE_ACCENT = RGBColor(59, 130, 246)   # Info Blue Accent
+COLOR_DARK_BG = RGBColor(10, 15, 30)         # Deep Space Navy (#0a0f1e)
+COLOR_LIGHT_BG = RGBColor(248, 250, 252)    # Light Slate Off-White
+COLOR_PRIMARY_TEXT = RGBColor(15, 23, 42)    # Slate 900
+COLOR_MUTED_TEXT = RGBColor(71, 85, 105)     # Slate 600
+COLOR_ORANGE_ACCENT = RGBColor(249, 115, 22) # Vibrant Orange (#f97316)
+COLOR_GREEN_ACCENT = RGBColor(34, 197, 94)   # Emerald Green (#22c55e)
+COLOR_BLUE_ACCENT = RGBColor(6, 182, 212)    # Cyber Teal (#06b6d4)
 COLOR_WHITE = RGBColor(255, 255, 255)
-COLOR_CARD_BORDER = RGBColor(226, 232, 240)  # Slate 200 (Card Outline)
+COLOR_CARD_BORDER = RGBColor(226, 232, 240)  # Slate 200
 
-FONT_HEADING = "Arial"
-FONT_BODY = "Arial"
+FONT_HEADING = "Plus Jakarta Sans"
+FONT_BODY = "Plus Jakarta Sans"
 
 # ==========================================
 # 2. Initialization & Slide Setup
@@ -132,776 +132,130 @@ def add_card(slide, left, top, width, height, card_title, bullets, accent_color=
         p.space_after = Pt(5)
         p.line_spacing = 1.05
 
+def add_image_slide(slide, category, title, image_path, card_title, bullets, accent_color=None):
+    apply_light_background(slide)
+    add_header(slide, category, title)
+    
+    # Left-hand picture box (preserving 5.0 x 5.0 aspect ratio for posters)
+    slide.shapes.add_picture(image_path, Inches(0.8), Inches(1.6), Inches(5.0), Inches(5.0))
+    
+    # Right-hand explanation card
+    add_card(slide, Inches(6.5), Inches(1.6), Inches(6.0), Inches(5.0), card_title, bullets, accent_color)
+
 # ==========================================
-# 4. Slide Data Definition
+# 4. Slide Data Definition (8 Slides Total)
 # ==========================================
 slides_data = [
     # Slide 1: Title Slide (Dark Theme)
     {
         "type": "dark_title",
         "title": "AAHAAR",
-        "subtitle": "Intelligent Food Donation, CSR Compliance & Environmental Impact Management Platform",
+        "subtitle": "Zero Waste. Zero Hunger. Fully Verified.",
         "desc": "A Unified B2B SaaS Enterprise Ecosystem Orchestrating Surplus Redirection, Cryptographic Verification, and Compliance Automation",
         "presenter": "Presenter: Santosh Patel | Department of Computer Science & Engineering",
-        "college": "ABES Engineering College | Spark Fellowship Round 2 Selection Challenge",
+        "college": "ABES Engineering College | Spark Fellowship Selection Challenge",
         "ip_spec": "IP Status: Patent-Pending Technology (System & Method for Secure Real-time Surplus Logistics Verification)"
     },
-    # Slide 2: Vision & Executive Summary (Light Theme, 2-Column)
+    # Slide 2: The Core Problem vs Aahaar (Light Theme, Image + Text)
     {
-        "type": "light_content",
-        "category": "Section 01: Strategic Vision",
-        "title": "Executive Summary & Core Vision",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Platform Vision (Zero Waste Ecosystem)",
-                "bullets": [
-                    "Empower enterprises to eliminate edible food waste while addressing global malnutrition challenges.",
-                    "Design a transparent, automated circular economy model for redistribution.",
-                    "Bridge the gap between food donors (commercial kitchens, banquets, offices) and verified NGOs in real time.",
-                    "Log all transactions securely to build immutable impact records and carbon offset credits."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Executive Summary",
-                "bullets": [
-                    "Aahaar is an enterprise-grade SaaS utility linking donors with local shelters.",
-                    "Solves the trust deficit via a proprietary cryptographic QR + PIN handshake workflow.",
-                    "Provides real-time environmental metrics (methane reduction, tree absorption equivalents).",
-                    "Automates tax savings audits under Section 80G and board reporting under CSR Section 135."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 3: Problem Statement: The Waste & Trust Paradox (Light Theme, 2-Column)
-    {
-        "type": "light_content",
+        "type": "light_image",
         "category": "Section 01: Strategic Vision",
         "title": "The Food Waste & Trust Paradox",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "The Distribution Crisis (SDG 2, 12, 13)",
-                "bullets": [
-                    "40% of food produced in India is wasted annually (worth over Rs. 92,000 crores).",
-                    "Over 190 million citizens go hungry daily due to massive coordinate mismatch.",
-                    "Organic waste dumped in municipal landfills releases potent methane gas.",
-                    "No centralized enterprise collection interface exists for corporate kitchens and caterers."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Systemic Operational Obstacles",
-                "bullets": [
-                    "Logistics Spoilage: Cooked food has a strict 4-hour shelf-life. Manual pickup routing is too slow.",
-                    "Trust Deficit: Donors lack transparency and auditing capabilities to verify receipt of donations.",
-                    "Incentive Deficit: High logistical costs discourage donation without immediate financial/tax write-offs.",
-                    "Fraud Vulnerability: Absence of active user credentials allows bad-actor redirection."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
+        "image_path": "images/aahaar_versus_traditional.png",
+        "card_title": "Solving the Operational Bottlenecks",
+        "bullets": [
+            "Traditional charity networks rely on manual entries, leading to data manipulation and food loss.",
+            "Lack of proof-of-delivery creates verification disputes between donors and NGOs.",
+            "Direct food donations typically fail to secure Section 80G corporate tax benefits.",
+            "Aahaar resolves these limitations with blockchain trust, QR verification, and structured tax metrics."
+        ],
+        "accent": COLOR_ORANGE_ACCENT
     },
-    # Slide 4: Proposed Solution: The Unified Ecosystem (Light Theme, 2-Column)
+    # Slide 3: Ecosystem Mind Map (Light Theme, Image + Text)
     {
-        "type": "light_content",
+        "type": "light_image",
         "category": "Section 01: Strategic Vision",
-        "title": "The AAHAAR Solution Architecture",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Intelligent Surplus Logistics",
-                "bullets": [
-                    "Real-time food listing with description, quantity, shelf life, and photo logs.",
-                    "Nearest Verified NGO Selection Algorithm handles geofenced matching under 15 mins.",
-                    "Role-based dashboard notifications (WebSockets) route allocations automatically.",
-                    "Secure document gate processes validation credentials before claims are allowed."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Compliance & Financial Automation",
-                "bullets": [
-                    "Automated Section 80G Indian Income Tax calculations value assets instantly.",
-                    "Dynamic certificate generator builds watermarked, scannable compliance receipts.",
-                    "Integrated ESG analytics dashboard charts greenhouse gas offsets and meals served.",
-                    "Smart contract logs on EVM provide an immutable, decentralized audit trail."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
+        "title": "Aahaar Platform Ecosystem Mind Map",
+        "image_path": "images/aahaar_mindmap_real_logo.png",
+        "card_title": "Core Ecosystem Connections",
+        "bullets": [
+            "Donors: Corporate offices, hotels, and event venues list surplus food on the portal.",
+            "Secure Handshake: Dual-party QR validation rules out pickup and transit delivery disputes.",
+            "Verified NGOs: Credentials checked via administrative gates and managed by EVM DAO.",
+            "Impact Incentives: Pre-populated Section 80G tax benefit files and live ESG carbon indexes."
+        ],
+        "accent": COLOR_GREEN_ACCENT
     },
-    # Slide 5: Enterprise Target Customers (Light Theme, 2-Column)
+    # Slide 4: Cryptographic QR Handshake (Light Theme, Image + Text)
     {
-        "type": "light_content",
-        "category": "Section 02: Commercial Model",
-        "title": "Enterprise Target Segments & Stakeholders",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Primary Commercial Donors",
-                "bullets": [
-                    "Hospitality: Large hotels, restaurants, and cloud kitchen clusters.",
-                    "Events: Wedding halls, banquet venues, and exhibition caterers.",
-                    "Corporate: Enterprise offices and manufacturing company cafeterias.",
-                    "Retailers: Supermarkets, grocery chains, and packaged food distributors.",
-                    "Institutions: Colleges, schools, and hospital kitchen networks."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Logistics & Governance Entities",
-                "bullets": [
-                    "NGO Partners: Verified local shelters, food banks, and charitable organizations.",
-                    "Municipalities: City corporations seeking to divert landfill organic mass.",
-                    "Corporate CSR: Compliance departments auditing social development indexes.",
-                    "Tax Auditors: Enterprise accountants validating deductible tax certificates."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
+        "type": "light_image",
+        "category": "Section 02: Logistics Verification",
+        "title": "Zero-Leakage Handshake Verification",
+        "image_path": "images/aahaar_trust_handshake.png",
+        "card_title": "Proof of Physical Delivery",
+        "bullets": [
+            "System generates a dynamic QR code and 6-digit OTP code when claims are approved.",
+            "NGO rider displays the QR code at the physical pickup site to verify arrival coordinates.",
+            "Donor scans the QR code to sign off the transaction and commit verification to the blockchain.",
+            "Solidity smart contract marks completion, awarding reputation scores on-chain."
+        ],
+        "accent": COLOR_BLUE_ACCENT
     },
-    # Slide 6: Multi-Role User Matrix (Light Theme, 2-Column)
+    # Slide 5: Section 80G Tax Exemption Shield (Light Theme, Image + Text)
     {
-        "type": "light_content",
-        "category": "Section 02: Commercial Model",
-        "title": "Multi-Role User Matrix & Permissions",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Operational Role Invariants",
-                "bullets": [
-                    "Donors: Authorize food listings, scan pick-up QR codes, and download tax receipts.",
-                    "NGO Representatives: Claim available listings, execute collections, and update statuses.",
-                    "Volunteers / Riders: Claim transit routes, handle physical cargo, and log handovers.",
-                    "Delivery Partners: Third-party API operators tracking geofenced vehicle logs."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Enterprise & Administrative Roles",
-                "bullets": [
-                    "CSR Managers: Review dashboard stats, compile carbon offset ledgers, and download files.",
-                    "Corporate Executives: Audit Section 135 spends and monitor CSR program growth.",
-                    "System Admins: Audit identity documents (PAN/Aadhaar), verify NGOs, and handle disputes.",
-                    "DAO Voters: Verified NGOs cast votes on-chain to approve new registry entrants."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
+        "type": "light_image",
+        "category": "Section 03: Compliance Automation",
+        "title": "Automated Tax Benefit Valuation",
+        "image_path": "images/aahaar_tax_exemption.png",
+        "card_title": "50% Tax Exemption Protocol",
+        "bullets": [
+            "System converts food category and weight weights into fair procurement values.",
+            "Enables corporate donors to legally claim a 50% Section 80G tax deduction.",
+            "Generates compliant, watermarked PDF certificates containing smart smartphone-scannable QR verification.",
+            "Verification receipts are locked until admin verifies donor credentials to prevent fraud."
+        ],
+        "accent": COLOR_ORANGE_ACCENT
     },
-    # Slide 7: Complete System Workflow (Light Theme, 4-Column Sequence)
+    # Slide 6: ESG & Carbon Offset Dashboard (Light Theme, Image + Text)
     {
-        "type": "light_content",
-        "category": "Section 03: Process Workflows",
-        "title": "Complete System Workflow: Surplus Food Rescue",
-        "layout": "4-column",
-        "cards": [
-            {
-                "title": "1. Detect & Match",
-                "bullets": [
-                    "Donor logs surplus.",
-                    "System validates food details and category tags.",
-                    "Matching Engine selects closest verified NGO."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "2. Claim & Code",
-                "bullets": [
-                    "NGO claims matching allocation.",
-                    "Admin verifies files.",
-                    "System compiles secure QR + 6-digit PIN pass."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            },
-            {
-                "title": "3. Scan & Verify",
-                "bullets": [
-                    "NGO rider reaches donor pickup site.",
-                    "Donor scans NGO QR (proximity validation).",
-                    "Hand-off verified."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "4. Log & Report",
-                "bullets": [
-                    "Donation state locked to EVM database.",
-                    "ESG dashboard matches carbon offsets.",
-                    "Tax Exemption receipt is issued."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
+        "type": "light_image",
+        "category": "Section 03: Compliance Automation",
+        "title": "Real-Time Environmental & Carbon Offsets",
+        "image_path": "images/aahaar_esg_carbon.png",
+        "card_title": "ESG Footprint Tracking",
+        "bullets": [
+            "Diverting organic waste from landfills avoids anaerobic methane emissions.",
+            "Applies scientific offset models: 2.5 kg CO₂ reduction per kg of surplus food rescued.",
+            "Translates carbon numbers into mature tree equivalents (22 kg CO₂/tree/year).",
+            "Prepares clean, board-ready sustainability metrics for annual CSR reports."
+        ],
+        "accent": COLOR_GREEN_ACCENT
     },
-    # Slide 8: NGO Food Request Workflow (Light Theme, 4-Column Sequence)
+    # Slide 7: Proposed System Architecture (Light Theme, Image + Text)
     {
-        "type": "light_content",
-        "category": "Section 03: Process Workflows",
-        "title": "NGO Food Request Workflow (Demand-Pull)",
-        "layout": "4-column",
-        "cards": [
-            {
-                "title": "1. Create & Broadcast",
-                "bullets": [
-                    "NGO files custom food demand request.",
-                    "Specifies category, quantity needed, and city.",
-                    "Broadcasts alert."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "2. Claim & Lock",
-                "bullets": [
-                    "Nearby donors receive push notifications.",
-                    "One matching donor claims request.",
-                    "Request locked instantly."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            },
-            {
-                "title": "3. Transit & Handover",
-                "bullets": [
-                    "NGO assigns vehicle / pickup time.",
-                    "Representative reaches donor site.",
-                    "Presents transaction QR."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "4. Settle & Sync",
-                "bullets": [
-                    "Donor scans QR code to verify pickup.",
-                    "EVM logs confirmation hash.",
-                    "System updates metrics."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 9: Direct NGO Donation Workflow (Light Theme, 4-Column Sequence)
-    {
-        "type": "light_content",
-        "category": "Section 03: Process Workflows",
-        "title": "Direct NGO Donation Workflow (Ad-hoc)",
-        "layout": "4-column",
-        "cards": [
-            {
-                "title": "1. Target Selection",
-                "bullets": [
-                    "Donor skips geofence routing.",
-                    "Selects target NGO from verified registry.",
-                    "Submits donation details."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "2. NGO Audit Gate",
-                "bullets": [
-                    "Target NGO receives push/Socket.IO alert.",
-                    "Evaluates shelf-life and volume matches.",
-                    "Accepts or rejects listing."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            },
-            {
-                "title": "3. Security Pass",
-                "bullets": [
-                    "Acceptance triggers QR generation.",
-                    "Transmits secure pickup code to NGO representative.",
-                    "Rendezvous scheduled."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "4. Verify & Seal",
-                "bullets": [
-                    "Donor inputs pickup verification token.",
-                    "Status committed to complete on EVM ledger.",
-                    "Issues digital receipt."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 10: QR Verification Workflow (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 03: Process Workflows",
-        "title": "Cryptographic QR Handshake & Geo-Verification",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Token & QR Generation",
-                "bullets": [
-                    "System compiles verification payload containing transaction ID, timestamp, and signature.",
-                    "Generates dynamic, single-use QR code and corresponding 6-digit OTP code.",
-                    "Restricts token validation to a geofenced radius surrounding the donor's coordinates.",
-                    "Enforces code expiry if pickup is not executed within specified timeline gates."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Validation & Verification Handshake",
-                "bullets": [
-                    "NGO representative displays QR code to the donor at physical pickup site.",
-                    "Donor scans QR code via camera portal (or manually inputs verification code).",
-                    "System validates match, logs client coordinate proximity, and seals state.",
-                    "Smart contract executes verifyDonation() to commit transaction on-chain."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 11: Status Lifecycle (Light Theme, 3-Column)
-    {
-        "type": "light_content",
-        "category": "Section 03: Process Workflows",
-        "title": "Unified Donation Lifecycle State Machine",
-        "layout": "3-column",
-        "cards": [
-            {
-                "title": "1. Initialization States",
-                "bullets": [
-                    "Pending: Surplus listed; awaiting verification and matching algorithm run.",
-                    "Accepted: Matched NGO claims listing; logistics coordinates generated.",
-                    "Pickup Started: Rider dispatched; location transit coordinates active."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "2. Verification States",
-                "bullets": [
-                    "Verification Pending: Food delivered at site; awaiting scan validation.",
-                    "Verified: Dual-party QR/PIN handshake completed and validated.",
-                    "Completed: On-chain transaction committed; certificates unlocked."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            },
-            {
-                "title": "3. Exception & Terminal States",
-                "bullets": [
-                    "Rejected: Listing fails safety audits or verification checks.",
-                    "Cancelled: Cancelled by donor or NGO before pickup transit starts.",
-                    "Expired: Food exceeds safe shelf-life limits without matching."
-                ],
-                "accent": COLOR_BLUE_ACCENT
-            }
-        ]
-    },
-    # Slide 12: Notification Architecture (Light Theme, 2-Column)
-    {
-        "type": "light_content",
+        "type": "light_image",
         "category": "Section 04: Technical Architecture",
-        "title": "Real-time Multi-channel Notification Engine",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Delivery Speed & Channels",
-                "bullets": [
-                    "Real-Time: Socket.IO broadcasts instant listings to nearby NGO dashboards.",
-                    "Background Push: Firebase Cloud Messaging (FCM) alerts mobile devices when apps are closed.",
-                    "Audit: Transactional emails transmit certificates, reports, and ledger invoices.",
-                    "Failsafe SMS: Automated text alerts bypass low mobile internet zones."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Reliability & Queue Architecture",
-                "bullets": [
-                    "Offline Queue: Caches alerts for delivery when network coverage is restored.",
-                    "Retry Manager: Automatically retries message transfers with exponential backoff.",
-                    "Geofence Filters: Restricts notifications to active NGOs inside a 5km radius.",
-                    "History Log: Retains a read/unread status database for audit tracking."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
+        "title": "Proposed System Architecture & Sync",
+        "image_path": "images/proposed_system_architecture.png",
+        "card_title": "Notification & Event Listeners",
+        "bullets": [
+            "Socket.IO connection feeds real-time updates directly to admin and user dashboards.",
+            "Firebase Cloud Messaging (FCM) drives offline alerts to browser tabs.",
+            "Twilio SMS gateway sends immediate OTP codes to logistics drivers.",
+            "Node.js background event listener synchronizes EVM smart contract logs to MongoDB."
+        ],
+        "accent": COLOR_BLUE_ACCENT
     },
-    # Slide 13: Dashboard Architecture (Light Theme, 3-Column)
-    {
-        "type": "light_content",
-        "category": "Section 04: Technical Architecture",
-        "title": "Enterprise Dashboard Architecture",
-        "layout": "3-column",
-        "cards": [
-            {
-                "title": "Corporate / CSR Dashboard",
-                "bullets": [
-                    "Section 135 Spend tracker.",
-                    "Contributions ledger (audit trail).",
-                    "Carbon reduction offsets (ESG).",
-                    "Employee engagement logs."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "NGO Registry Dashboard",
-                "bullets": [
-                    "Active matching listings board.",
-                    "Custom food request broadcasts.",
-                    "Delivery rider dispatch metrics.",
-                    "Reputation scorecard ledger."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            },
-            {
-                "title": "System Admin Control Panel",
-                "bullets": [
-                    "Identity verification vault (PAN/Aadhaar check).",
-                    "Credential reviews and approvals.",
-                    "Dispute routing board.",
-                    "System health indicators."
-                ],
-                "accent": COLOR_BLUE_ACCENT
-            }
-        ]
-    },
-    # Slide 14: Environmental Impact Engine (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 04: Technical Architecture",
-        "title": "Automated Environmental Impact Engine",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Carbon Offset Mechanics (SDG 13)",
-                "bullets": [
-                    "Diverting food waste avoids landfill decay methane emissions (a GHG 25x more potent than CO₂).",
-                    "Formula: CO₂ Saved (kg) = Rescued Food (kg) x 2.5 (Standard Diversion Factor).",
-                    "Sequestration translation: Tree Equivalent = CO₂ Saved / 22 (absorption per tree per year).",
-                    "Converts raw solid waste metrics into audit-ready carbon offset credits."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "ESG Resource Metrics",
-                "bullets": [
-                    "Water Footprint Restored: Tracks virtual water saved by redirecting items (liters).",
-                    "Landfill Diversion Weight: Measures total organic matter prevented from decay (tons).",
-                    "Social Impact Multiplier: Meals Distributed = Saved Food (kg) x 2.",
-                    "Electricity Offset: Models energy savings in farm-to-table supply chains."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 15: CSR Compliance Module (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 05: Compliance & Security",
-        "title": "Corporate CSR & Section 135 Compliance",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Audit-Ready CSR Reporting",
-                "bullets": [
-                    "Aligns directly with Section 135 of the Indian Companies Act, 2013.",
-                    "Generates automated monthly, quarterly, and annual compliance reports.",
-                    "Provides secure digital audit trails mapping donor logs to verified NGO registration certificates.",
-                    "Tracks employee volunteer participation logs for ESG rating systems."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Enterprise ESG Compliance Suite",
-                "bullets": [
-                    "Automated corporate carbon footprint credit validation.",
-                    "Contributions ledger linking invoices to physical delivery proofs.",
-                    "Direct export formats for board reviews and statutory filings.",
-                    "Verified compliance rating scoring NGO reliability and hygiene."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 16: Tax Benefit Management (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 05: Compliance & Security",
-        "title": "Tax Benefit Management & Section 80G Auditing",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Exemption Valuation Engine",
-                "bullets": [
-                    "Automates tax savings under Section 80G of the Indian Income Tax Act, 1961.",
-                    "Maps weight to category base rates for valuation (e.g. ₹45/kg Cooked Meals, ₹100/kg Packaged).",
-                    "Direct savings calculation: Exemption claim (50% value) x Corporate Tax Bracket (e.g. 30%).",
-                    "Enforces document verification gate (approved PAN) before downloads are unlocked."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Anti-Forgery PDF Receipts",
-                "bullets": [
-                    "Compiled with dynamic watermark layer to prevent duplication and forgery.",
-                    "Embedded QR code contains signed transaction summary (Receipt ID, timestamp, PAN, NGO).",
-                    "Scanning verification QR pulls details instantly from secure backend registry.",
-                    "Official green circular ink stamp rendering style mimics physical audit stamp."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 17: Fraud Prevention (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 05: Compliance & Security",
-        "title": "Fraud Prevention & Trust Safeguards",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Operational Verification Gates",
-                "bullets": [
-                    "Donor Identity Check: Required Aadhaar/identity validation at registration onboarding.",
-                    "NGO Credentials Gate: Required registration certificate audits before claims are permitted.",
-                    "Proximity Verification: Captures geo-coordinates during handshake scans.",
-                    "Rules-Based Duplicate Detection: Flags copycat donation weights and description logs."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Cryptographic & Technical Controls",
-                "bullets": [
-                    "Time-Limited QR: Code regeneration occurs every 60 seconds to prevent replay attacks.",
-                    "One-Time Code: Verification codes expire 15 minutes after issuance.",
-                    "Audit Logging: Captures every state change with admin footprint stamps.",
-                    "Security Proxy: Smart contract roles block unauthorized reputation point writes."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 18: Technical Architecture (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 04: Technical Architecture",
-        "title": "System Architecture & Core Technology Stack",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Web2 Speed & Logistics Layer",
-                "bullets": [
-                    "Frontend UI: Next.js, React, TailwindCSS, and Shadcn UI components.",
-                    "API Core: Node.js / Express.js managing routes and user databases.",
-                    "Real-Time Engine: Socket.IO handles sub-second dispatch and alerts.",
-                    "Storage: MongoDB caches records; AWS S3 vaults identity documentation.",
-                    "Background Sync: Redis queues manage notifications and PDF compilation."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Web3 Immutability & Trust Layer",
-                "bullets": [
-                    "Smart Contracts: Solidity contracts built and compiled via Hardhat.",
-                    "NGORegistry.sol: Stores registered NGO wallet addresses and documentation IPFS hashes.",
-                    "Donation.sol: Enforces state transitions (Accepted, Transit, Completed).",
-                    "ReputationSystem.sol: Upgradeable proxy contract rewarding logistics score points (+50/+30).",
-                    "AahaarDAO.sol: Governs peer-onboarding of NGOs to bypass centralized admin gate."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 19: Database Architecture (Light Theme, 3-Column)
-    {
-        "type": "light_content",
-        "category": "Section 04: Technical Architecture",
-        "title": "Database Schema & Entity Relationships",
-        "layout": "3-column",
-        "cards": [
-            {
-                "title": "Core Users & NGOs",
-                "bullets": [
-                    "Users: Name, Email, PasswordHash, Role, VerificationStatus, WalletAddress.",
-                    "NGOs: NGOName, RegisterNumber, PAN, Wallet, ReputationScore, ActiveFlag."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Donations & Requests",
-                "bullets": [
-                    "Donation: DonorID, RecipientNGO, ItemsList, Weight, Geohash, Status, EVMHash, ProofCID.",
-                    "FoodRequest: NGOID, TargetQty, Category, UrgencyLevel, FulfilledQty, Expiry."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            },
-            {
-                "title": "Audits & Certificates",
-                "bullets": [
-                    "Certificates: CertificateID, DonationID, TaxExemptionClaim, DigitalSignature, ScannableQR.",
-                    "VerificationLogs: GeoCoordinates, Timestamp, ScannerID, OTPHash."
-                ],
-                "accent": COLOR_BLUE_ACCENT
-            }
-        ]
-    },
-    # Slide 20: Security Architecture (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 05: Compliance & Security",
-        "title": "Data Protection & Security Architecture",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Network & API Security",
-                "bullets": [
-                    "Enforces HTTPS with TLS 1.3 encryption across all communication routes.",
-                    "JWT authentication with secure, HTTP-only cookie refresh token rotation.",
-                    "Rate limiting policies restrict brute-force access to verification and auth endpoints.",
-                    "Helmet middleware secures HTTP headers; strict CORS boundaries restrict cross-origin threats."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Data & Contract Protections",
-                "bullets": [
-                    "MongoDB validation schemas enforce data types and prevent injection attacks.",
-                    "Solidity smart contracts utilize OpenZeppelin base contracts to prevent reentrancy.",
-                    "All documents stored in S3 are encrypted at rest using AES-256 keys.",
-                    "UUPS smart contract upgrade proxy blocks unauthorized execution gates."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 21: Patent-Worthy Technical Innovations (Light Theme, 3-Column)
-    {
-        "type": "light_content",
-        "category": "Section 06: Innovation Case",
-        "title": "Key Patentable Technical Claims (Provisional)",
-        "layout": "3-column",
-        "cards": [
-            {
-                "title": "Claim 1: Logistics Handshake",
-                "bullets": [
-                    "Method for double-verifying physical handover coordinates.",
-                    "Dynamic, signed QR code generation linked to localized geohashes.",
-                    "System rejects verification if donor camera coordinates mismatch pickup coordinates."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Claim 2: Dual-State Syncing",
-                "bullets": [
-                    "System synchronizes high-performance database state with EVM log transactions.",
-                    "Asynchronous polling middleware catches blockchain log events to update MongoDB.",
-                    "Maintains operational continuity during low-internet drops."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            },
-            {
-                "title": "Claim 3: Exemption Engine",
-                "bullets": [
-                    "System automates Indian Income Tax Section 80G calculations at food handover.",
-                    "Category rate mapping values donor assets in real-time.",
-                    "Generates secure, watermarked certificates with embedded QR codes."
-                ],
-                "accent": COLOR_BLUE_ACCENT
-            }
-        ]
-    },
-    # Slide 22: Commercial Sustainability & Business Model (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 02: Commercial Model",
-        "title": "Commercial Business Model & Profitability",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Enterprise Revenue Streams",
-                "bullets": [
-                    "B2B SaaS Subscriptions: Charge corporate kitchens Rs. 1,500/month for ESG dashboards.",
-                    "80G Tax Exemption Commission: 3% fee on realized cash tax savings downloaded.",
-                    "Premium NGO Console: Logistics tracking tools licensed to large food banks.",
-                    "CSR API Integrations: Enterprise system connectors sold to SAP/Oracle ERPs."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Financial Scale Targets",
-                "bullets": [
-                    "Launch Capitalization: Rs. 10,000 hyper-local rollout budget (Flyers, basic fuel, staging runs).",
-                    "12-Month Targets: Rescuing 10,000+ kg food; serving 20,000+ meals; avoiding 25,000 kg CO₂.",
-                    "Economic Value: Unlocking Rs. 3,50,000+ in corporate tax savings.",
-                    "Scales city-by-city through low startup cost geofenced cells."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 23: Competitive Analysis & Differentiators (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 06: Innovation Case",
-        "title": "Competitive Differentiators & Market Position",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Competitor Landscape Limitations",
-                "bullets": [
-                    "Robin Hood Army: High volunteer base but lacks corporate compliance and dashboards.",
-                    "Feeding India: Large programmatic execution but lacks automated tax deduction files.",
-                    "Traditional NGOs: Inefficient manual pickup matching leads to high cooked food waste.",
-                    "Food Aggregators (Zomato/Swiggy): Core commercial delivery models lack CSR integration."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "AAHAAR Key Differentiators",
-                "bullets": [
-                    "Unified B2B Platform: Bridges donors, logistics, and accountants under one SaaS console.",
-                    "Zero Fraud Handshake: Geofenced QR validations secure physical asset transfers.",
-                    "Compliance Ledgers: Automated, audited reports satisfy CSR Section 135 regulations.",
-                    "Real-Time ESG Indexes: Carbon footprint calculations map offsets to trees saved."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 24: Enterprise Growth Roadmap & Future Directions (Light Theme, 2-Column)
-    {
-        "type": "light_content",
-        "category": "Section 07: Roadmap",
-        "title": "Growth Roadmap & Technological Future",
-        "layout": "2-column",
-        "cards": [
-            {
-                "title": "Advanced Automation & IoT Integrations",
-                "bullets": [
-                    "Food Freshness Assessment: Computer vision analyzes item photos to predict remaining shelf life.",
-                    "IoT Cold Chain Tracking: Hardware sensors audit transportation temperatures in real time.",
-                    "Demand Forecasting: Machine learning models predict food deficits across city geohashes.",
-                    "Drone Delivery Integrations: Autonomous airborne routing for critical, short shelf-life cooked meals."
-                ],
-                "accent": COLOR_ORANGE_ACCENT
-            },
-            {
-                "title": "Ecosystem Scaling & Integrations",
-                "bullets": [
-                    "Carbon Credit Marketplace: Let corporate partners trade carbon savings points on Web3 exchanges.",
-                    "POS Integrations: Connect with Zomato/Swiggy order APIs to log commercial kitchen waste.",
-                    "Public Distribution Sync: Connect with municipal PDS networks to support urban food security.",
-                    "Global Rollout: Replicate geofenced model across developing urban centers globally."
-                ],
-                "accent": COLOR_GREEN_ACCENT
-            }
-        ]
-    },
-    # Slide 25: Summary & Closing Slide (Dark Theme)
+    # Slide 8: The Corporate Partnership Invitation (Dark Theme)
     {
         "type": "dark_closing",
         "title": "AAHAAR: DIGITIZING TRUST, FEEDING LIVES",
         "subtitle": "Together, We Can Eliminate Food Waste, Empower Communities, and Build a Sustainable Future.",
         "tagline": "AAHAAR — Feeding People. Empowering NGOs. Transforming CSR. Protecting the Planet.",
         "bullets": [
-            "Patent-Pending Framework: Safeguards core verification and automated tax valuation algorithms from copycats.",
-            "Enterprise Utility Dashboard: Full-scale SaaS solution addressing corporate CSR and green ESG targets.",
-            "Operational MVP: Deployed codebase integrating Express APIs, Socket.IO, and Solidity smart contracts."
+            "Enterprise Utility: Complete SaaS solution addressing corporate CSR and green ESG targets.",
+            "Operational Codebase: Deployed system integrating Express APIs, Socket.IO, and Solidity contracts.",
+            "Call to Action: Inviting foundations (like Reliance Foundation) and enterprise leaders to partner."
         ],
         "footer": "ABES Engineering College  •  Investor Pitch  •  Contact: santosh.patel@abes.ac.in"
     }
@@ -1041,27 +395,8 @@ for idx, data in enumerate(slides_data):
         p_foot.font.size = Pt(10.5)
         p_foot.font.color.rgb = COLOR_MUTED_TEXT
 
-    elif data["type"] == "light_content":
-        apply_light_background(slide)
-        add_header(slide, data["category"], data["title"])
-        
-        layout = data["layout"]
-        cards = data["cards"]
-        
-        if layout == "2-column":
-            add_card(slide, Inches(0.8), Inches(1.8), Inches(5.6), Inches(4.8), cards[0]["title"], cards[0]["bullets"], cards[0]["accent"])
-            add_card(slide, Inches(6.933), Inches(1.8), Inches(5.6), Inches(4.8), cards[1]["title"], cards[1]["bullets"], cards[1]["accent"])
-            
-        elif layout == "3-column":
-            add_card(slide, Inches(0.8), Inches(1.8), Inches(3.64), Inches(4.8), cards[0]["title"], cards[0]["bullets"], cards[0]["accent"])
-            add_card(slide, Inches(4.84), Inches(1.8), Inches(3.64), Inches(4.8), cards[1]["title"], cards[1]["bullets"], cards[1]["accent"])
-            add_card(slide, Inches(8.88), Inches(1.8), Inches(3.64), Inches(4.8), cards[2]["title"], cards[2]["bullets"], cards[2]["accent"])
-            
-        elif layout == "4-column":
-            add_card(slide, Inches(0.8), Inches(1.8), Inches(2.68), Inches(4.8), cards[0]["title"], cards[0]["bullets"], cards[0]["accent"])
-            add_card(slide, Inches(3.78), Inches(1.8), Inches(2.68), Inches(4.8), cards[1]["title"], cards[1]["bullets"], cards[1]["accent"])
-            add_card(slide, Inches(6.76), Inches(1.8), Inches(2.68), Inches(4.8), cards[2]["title"], cards[2]["bullets"], cards[2]["accent"])
-            add_card(slide, Inches(9.74), Inches(1.8), Inches(2.68), Inches(4.8), cards[3]["title"], cards[3]["bullets"], cards[3]["accent"])
+    elif data["type"] == "light_image":
+        add_image_slide(slide, data["category"], data["title"], data["image_path"], data["card_title"], data["bullets"], data["accent"])
 
 # Save the presentation
 output_path = "Aahaar_Patent_Presentation.pptx"
