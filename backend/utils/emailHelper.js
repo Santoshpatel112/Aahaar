@@ -33,10 +33,15 @@ export const sendOTPEmail = async (email, otp) => {
   if (hasAppPassword) {
     try {
       const transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: {
           user: emailUser,
           pass: emailPass
+        },
+        tls: {
+          rejectUnauthorized: false
         }
       });
 
@@ -169,19 +174,29 @@ export const sendDonationReceiptEmail = async (email, pdfBuffer, receiptNo, guid
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: hasAppPassword ? {
-        user: emailUser,
-        pass: emailPass
+    const transporter = nodemailer.createTransport(
+      hasAppPassword ? {
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: {
+          user: emailUser,
+          pass: emailPass
+        },
+        tls: {
+          rejectUnauthorized: false
+        }
       } : {
-        type: 'OAuth2',
-        user: emailUser,
-        clientId: clientId,
-        clientSecret: clientSecret,
-        refreshToken: refreshToken,
-      },
-    });
+        service: 'gmail',
+        auth: {
+          type: 'OAuth2',
+          user: emailUser,
+          clientId: clientId,
+          clientSecret: clientSecret,
+          refreshToken: refreshToken,
+        },
+      }
+    );
 
     const mailOptions = {
       from: `"Aahaar Initiative" <${emailUser}>`,
