@@ -2,10 +2,12 @@ import { ethers } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 
-const rpcUrl = process.env.POLYGON_AMOY_RPC_URL || "https://rpc-amoy.polygon.technology";
+const rpcUrl = process.env.POLYGON_AMOY_RPC_URL || "https://polygon-amoy.drpc.org";
 const privateKey = process.env.BACKEND_WALLET_PRIVATE_KEY;
 
-export const provider = new ethers.JsonRpcProvider(rpcUrl);
+// Pass static network to prevent ethers from running an infinite 1s detectNetwork retry loop when offline
+const network = new ethers.Network("polygon-amoy", 80002);
+export const provider = new ethers.JsonRpcProvider(rpcUrl, network, { staticNetwork: network });
 
 let tempSigner;
 if (privateKey) {
