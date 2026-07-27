@@ -419,17 +419,11 @@ const sendOTP = asyncHandler(async (req, res) => {
 
   if (!emailSent) {
     console.warn(`[OTP DELIVERY WARNING] Physical email dispatch failed for ${normalizedEmail}. OTP stored in MongoDB: ${otp}`);
-    return res.status(200).json({
-      success: true,
-      message: `OTP generated! Verification Code: ${otp}`,
-      devOtp: otp
-    });
   }
 
   res.status(200).json({ 
     success: true, 
-    message: "Verification OTP code sent to your email.",
-    devOtp: otp 
+    message: "Verification OTP code sent to your email." 
   });
 });
 

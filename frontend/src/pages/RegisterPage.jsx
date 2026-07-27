@@ -119,9 +119,6 @@ export default function RegisterPage() {
 
     if (res.success) {
       setShowOtpInput(true);
-      if (res.devOtp) {
-        setOtpCode(res.devOtp);
-      }
       showToast(res.message || 'Verification OTP code sent to your email.', 'success');
     } else {
       showToast(res.error || 'Failed to send OTP code', 'error');
