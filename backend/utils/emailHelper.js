@@ -52,7 +52,12 @@ export const sendOTPEmail = async (email, otp) => {
       const mailOptions = {
         from: `"Aahaar Verification" <${emailUser}>`,
         to: email,
-        subject: "Aahaar Account Verification OTP",
+        subject: `🌾 Aahaar Verification OTP: ${otp}`,
+        headers: {
+          "X-Priority": "1 (Highest)",
+          "X-MSMail-Priority": "High",
+          "Importance": "High"
+        },
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
             <h2 style="color: #f97316; text-align: center; margin-bottom: 24px;">🌾 Aahaar Account Verification</h2>
@@ -92,7 +97,12 @@ export const sendOTPEmail = async (email, otp) => {
       const mailOptions587 = {
         from: `"Aahaar Verification" <${emailUser}>`,
         to: email,
-        subject: "Aahaar Account Verification OTP",
+        subject: `🌾 Aahaar Verification OTP: ${otp}`,
+        headers: {
+          "X-Priority": "1 (Highest)",
+          "X-MSMail-Priority": "High",
+          "Importance": "High"
+        },
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
             <h2 style="color: #f97316; text-align: center; margin-bottom: 24px;">🌾 Aahaar Account Verification</h2>
@@ -134,7 +144,12 @@ export const sendOTPEmail = async (email, otp) => {
       const mailOptions = {
         from: `"Aahaar Verification" <${emailUser}>`,
         to: email,
-        subject: "Aahaar Account Verification OTP",
+        subject: `🌾 Aahaar Verification OTP: ${otp}`,
+        headers: {
+          "X-Priority": "1 (Highest)",
+          "X-MSMail-Priority": "High",
+          "Importance": "High"
+        },
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
             <h2 style="color: #f97316; text-align: center; margin-bottom: 24px;">🌾 Aahaar Account Verification</h2>
