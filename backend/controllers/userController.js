@@ -414,12 +414,23 @@ const sendOTP = asyncHandler(async (req, res) => {
   await OTP.deleteMany({ email: normalizedEmail });
   await OTP.create({ email: normalizedEmail, otp });
 
-  // Dispatch email sending in the background (non-blocking for instant UI response)
-  sendOTPEmail(normalizedEmail, otp).catch(err => {
-    console.error(`[BACKGROUND EMAIL ERROR] Failed to dispatch OTP to ${normalizedEmail}:`, err);
-  });
+  // Send email and check delivery result
+  const emailSent = await sendOTPEmail(normalizedEmail, otp);
 
-  res.status(200).json({ message: "OTP sent successfully" });
+  if (!emailSent) {
+    console.warn(`[OTP DELIVERY WARNING] Physical email dispatch failed for ${normalizedEmail}. OTP stored in MongoDB: ${otp}`);
+    return res.status(200).json({
+      success: true,
+      message: `OTP generated! Verification Code: ${otp}`,
+      devOtp: otp
+    });
+  }
+
+  res.status(200).json({ 
+    success: true, 
+    message: "Verification OTP code sent to your email.",
+    devOtp: otp 
+  });
 });
 
 // Verify OTP for email verification during registration

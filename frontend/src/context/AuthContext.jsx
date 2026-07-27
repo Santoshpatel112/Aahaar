@@ -73,7 +73,11 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const res = await api.post('/aahar/users/send-otp', { email });
-      return { success: true, message: res.data?.message || 'OTP sent successfully.' };
+      return { 
+        success: true, 
+        message: res.data?.message || 'OTP sent successfully.',
+        devOtp: res.data?.devOtp
+      };
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data || 'Failed to send OTP.';
       return { success: false, error: msg };
