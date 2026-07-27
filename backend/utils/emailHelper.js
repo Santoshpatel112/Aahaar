@@ -31,7 +31,7 @@ export const sendOTPEmail = async (email, otp) => {
 
   // Try App Password first if available
   if (hasAppPassword) {
-    // Attempt 1: Port 465 Direct SSL
+    // Attempt 1: Port 465 Direct SSL (with strict fast timeouts)
     try {
       const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
@@ -41,6 +41,9 @@ export const sendOTPEmail = async (email, otp) => {
           user: emailUser,
           pass: emailPass
         },
+        connectionTimeout: 4000,
+        greetingTimeout: 4000,
+        socketTimeout: 6000,
         tls: {
           rejectUnauthorized: false
         }
@@ -74,14 +77,17 @@ export const sendOTPEmail = async (email, otp) => {
       console.error(`[SMTP ERROR Port 465] Failed for ${email}:`, appPass465Err.message);
     }
 
-    // Attempt 2: Service 'gmail' (Port 587)
+    // Attempt 2: Service 'gmail' (Port 587 with strict fast timeouts)
     try {
       const transporter587 = nodemailer.createTransport({
         service: 'gmail',
         auth: {
           user: emailUser,
           pass: emailPass
-        }
+        },
+        connectionTimeout: 4000,
+        greetingTimeout: 4000,
+        socketTimeout: 6000
       });
       const mailOptions587 = {
         from: `"Aahaar Verification" <${emailUser}>`,

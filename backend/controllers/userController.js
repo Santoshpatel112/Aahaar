@@ -414,15 +414,10 @@ const sendOTP = asyncHandler(async (req, res) => {
   await OTP.deleteMany({ email: normalizedEmail });
   await OTP.create({ email: normalizedEmail, otp });
 
-  // Send email
-  const emailSent = await sendOTPEmail(normalizedEmail, otp);
-  if (!emailSent) {
-    console.warn(`[OTP FALLBACK LOG] SMTP failed for ${normalizedEmail}. Generated OTP stored in MongoDB: ${otp}`);
-    return res.status(200).json({
-      message: "OTP sent successfully. (Check email or server logs if provider delayed)",
-      devOtp: process.env.NODE_ENV !== "production" ? otp : undefined
-    });
-  }
+  // Dispatch email sending in the background (non-blocking for instant UI response)
+  sendOTPEmail(normalizedEmail, otp).catch(err => {
+    console.error(`[BACKGROUND EMAIL ERROR] Failed to dispatch OTP to ${normalizedEmail}:`, err);
+  });
 
   res.status(200).json({ message: "OTP sent successfully" });
 });
