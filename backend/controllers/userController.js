@@ -455,12 +455,13 @@ const googleAuth = asyncHandler(async (req, res) => {
   }
 
   // Verify ID Token
-  const client = new OAuth2Client(process.env.GOOGLE_CLINT_ID);
+  const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLINT_ID;
+  const client = new OAuth2Client(googleClientId);
   let payload;
   try {
     const ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLINT_ID,
+      audience: googleClientId,
     });
     payload = ticket.getPayload();
   } catch (err) {
