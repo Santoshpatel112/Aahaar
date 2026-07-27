@@ -9,12 +9,57 @@ import path from "path";
  * @param {string} otp - The 6-digit OTP code
  */
 export const sendOTPEmail = async (email, otp) => {
+  const resendApiKey = process.env.RESEND_API_KEY;
   const emailUser = process.env.EMAIL_USER;
   const rawEmailPass = process.env.EMAIL_PASS;
   const emailPass = rawEmailPass ? rawEmailPass.replace(/\s+/g, '') : '';
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLINT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLINT_SECRATE_ID;
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN || process.env.GOOGLE_REFRESS_TOKEN;
+
+  // 1. HTTP API (Resend) - Best for Cloud Servers like Render (Port 443 HTTPS, Never Blocked)
+  if (resendApiKey) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: process.env.RESEND_FROM_EMAIL || 'Aahaar Verification <onboarding@resend.dev>',
+          to: [email],
+          subject: `🌾 Aahaar Verification OTP: ${otp}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+              <h2 style="color: #f97316; text-align: center; margin-bottom: 24px;">🌾 Aahaar Account Verification</h2>
+              <p>Hello,</p>
+              <p>Thank you for joining Aahaar. To complete your registration, please verify your email address using the following One-Time Password (OTP):</p>
+              <div style="background-color: #fff7ed; border: 1px dashed #f97316; padding: 15px; text-align: center; margin: 24px 0; border-radius: 8px;">
+                <span style="font-size: 28px; font-weight: bold; color: #f97316; letter-spacing: 6px;">${otp}</span>
+              </div>
+              <p>This OTP is valid for <strong>5 minutes</strong>. If you did not request this verification, please ignore this email.</p>
+              <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
+              <p style="color: #888888; font-size: 12px; text-align: center; line-height: 1.5;">
+                Aahaar Initiative — Fighting hunger, sharing hope. One meal at a time.
+              </p>
+            </div>
+          `
+        })
+      });
+
+      if (response.ok) {
+        const resData = await response.json();
+        console.log(`[RESEND API] Verification email sent instantly to ${email}. ID: ${resData.id}`);
+        return true;
+      } else {
+        const errText = await response.text();
+        console.error(`[RESEND API ERROR] Failed for ${email}:`, errText);
+      }
+    } catch (resendErr) {
+      console.error(`[RESEND API FETCH ERROR] Failed for ${email}:`, resendErr.message);
+    }
+  }
 
   const hasOAuth2 = emailUser && clientId && clientSecret && refreshToken;
   const hasAppPassword = emailUser && emailPass;
