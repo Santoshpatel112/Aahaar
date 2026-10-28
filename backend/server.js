@@ -1,3 +1,4 @@
+import './polyfill.js';
 import dotenv from 'dotenv';
 dotenv.config({ path: "./.env", override: true });
 import path from 'path';
