@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
 import { showToast } from '../components/Toast';
+import RatingSummary from '../components/RatingSummary';
 
 const FOOD_PARTICLES = ['🍎', '🥗', '🍞', '🥛', '🍱', '🥕', '🍇', '🌾', '🥦', '🍊', '🫙', '🍚', '🧅', '🥑', '🍋'];
 
@@ -361,7 +362,12 @@ export default function LandingPage() {
                       {/* Card Header */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                         <div>
-                          <h4 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 4 }}>{req.ngoId?.ngoName}</h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <h4 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 4 }}>{req.ngoId?.ngoName}</h4>
+                            {req.ngoId?._id && (
+                              <RatingSummary targetId={req.ngoId._id} role="ngo" compact />
+                            )}
+                          </div>
                           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>📍 {req.ngoId?.ngoCity}, {req.ngoId?.ngoState}</span>
                         </div>
                         <span style={{
@@ -1181,7 +1187,12 @@ export default function LandingPage() {
                 <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 14, fontSize: '0.9rem', textAlign: 'left' }}>
                   <div style={{ background: 'rgba(255,255,255,0.02)', padding: 14, borderRadius: 8, border: '1px solid var(--border-color)' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 2 }}>NGO Name</div>
-                    <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{selectedRequestDetails.ngoId?.ngoName || '—'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{selectedRequestDetails.ngoId?.ngoName || '—'}</div>
+                      {selectedRequestDetails.ngoId?._id && (
+                        <RatingSummary targetId={selectedRequestDetails.ngoId._id} role="ngo" compact />
+                      )}
+                    </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4 }}>
                       📍 {selectedRequestDetails.ngoId?.ngoCity}, {selectedRequestDetails.ngoId?.ngoState}
                     </div>

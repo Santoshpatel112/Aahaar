@@ -6,6 +6,9 @@ import { showToast } from '../components/Toast';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useWallet } from '../context/WalletContext';
 import { ethers } from 'ethers';
+import RatingModal from '../components/RatingModal';
+import RatingSummary from '../components/RatingSummary';
+import ReviewsList from '../components/ReviewsList';
 
 
 const FOOD_CATEGORIES = [
@@ -223,6 +226,25 @@ export default function NgoDashboard() {
     numberOfBeneficiaries: '',
   });
 
+  // Rating Modal States
+  const [ratingModalDonation, setRatingModalDonation] = useState(null);
+  const [userRatingsMap, setUserRatingsMap] = useState({});
+
+  const fetchUserRatings = useCallback(async () => {
+    try {
+      const res = await api.get('/aahar/ratings/me');
+      const list = res.data?.ratings || [];
+      const map = {};
+      list.forEach((r) => {
+        const dId = r.donation?._id || r.donation;
+        if (dId) map[String(dId)] = r;
+      });
+      setUserRatingsMap(map);
+    } catch (err) {
+      console.error('Error fetching user ratings in NGO dashboard:', err);
+    }
+  }, []);
+
   // Used for manual refreshes (refresh button, post-submit reload)
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -234,12 +256,13 @@ export default function NgoDashboard() {
       setNgo(resRequests.data?.ngo || null);
       setRequests(resRequests.data?.requests || []);
       setAssignedDonations(resDonations.data?.donations || []);
+      await fetchUserRatings();
     } catch {
       showToast('Could not load NGO data', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchUserRatings]);
 
   const fetchDaoProposals = useCallback(async () => {
     if (!contracts?.AahaarDAO) return;
@@ -988,6 +1011,14 @@ export default function NgoDashboard() {
               </div>
             )}
 
+            {/* NGO Reputation & Reviews */}
+            {ngo && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 1fr', gap: 20 }}>
+                <RatingSummary targetId={ngo._id} role="ngo" title="NGO Public Reputation (From Donors)" />
+                <ReviewsList targetId={ngo._id} role="ngo" title="Donor Reviews & Feedback" pageSize={3} />
+              </div>
+            )}
+
             {/* Quick guide if NGO is approved and no requests yet */}
             {ngo?.isApproved && requests.length === 0 && (
               <div style={{ padding: '24px 28px', background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.15)', borderRadius: 'var(--radius-lg)', display: 'flex', gap: 20, alignItems: 'flex-start' }}>
@@ -1287,6 +1318,54 @@ export default function NgoDashboard() {
                         </div>
                       )}
 
+                      {/* Rate Donor button for fulfilled requests with donor */}
+                      {isRequestStatusMatch(req.status, 'fulfilled') && req.acceptedBy && (
+                        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
+                          {userRatingsMap[req._id] ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                fontSize: '0.8rem',
+                                padding: '6px 12px',
+                                background: 'rgba(251, 191, 36, 0.1)',
+                                border: '1px solid rgba(251, 191, 36, 0.3)',
+                                borderRadius: 6,
+                                color: '#fbbf24',
+                                fontWeight: 600,
+                              }}
+                            >
+                              ⭐ Rated ({userRatingsMap[req._id].rating}★)
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              style={{
+                                fontSize: '0.8rem',
+                                padding: '7px 16px',
+                                background: 'var(--grad-primary)',
+                                border: 'none',
+                                color: '#fff',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                borderRadius: 6,
+                              }}
+                              onClick={() => {
+                                const donorName = req.acceptedBy?.firstName ? `${req.acceptedBy.firstName} ${req.acceptedBy.surname || ''}` : 'Food Donor';
+                                setRatingModalDonation({
+                                  donation: req,
+                                  recipientName: donorName,
+                                });
+                              }}
+                            >
+                              ⭐ Rate Donor
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       {/* Action buttons (only show manual fulfill button if no donor has accepted yet) */}
                       {req.status === 'approved' && !req.acceptedBy && (
                         <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
@@ -1488,6 +1567,55 @@ export default function NgoDashboard() {
                             >
                               📷 Verify Pickup
                             </button>
+                          </div>
+                        )}
+
+                        {/* Rate Donor for Completed Donations */}
+                        {isCompleted && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
+                            {userRatingsMap[donation._id] ? (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: '0.8rem',
+                                  padding: '6px 12px',
+                                  background: 'rgba(251, 191, 36, 0.1)',
+                                  border: '1px solid rgba(251, 191, 36, 0.3)',
+                                  borderRadius: 6,
+                                  color: '#fbbf24',
+                                  fontWeight: 600,
+                                }}
+                                title={`You rated this donor ${userRatingsMap[donation._id].rating}★`}
+                              >
+                                ⭐ Rated ({userRatingsMap[donation._id].rating}★)
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn-primary"
+                                style={{
+                                  fontSize: '0.8rem',
+                                  padding: '7px 16px',
+                                  background: 'var(--grad-primary)',
+                                  border: 'none',
+                                  color: '#fff',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  borderRadius: 6,
+                                }}
+                                onClick={() => {
+                                  const dName = donation.contactDetails?.contactPersonName || (donation.foodItemDetails?.[0]?.donorId?.firstName ? `${donation.foodItemDetails[0].donorId.firstName} ${donation.foodItemDetails[0].donorId.surname || ''}` : 'Food Donor');
+                                  setRatingModalDonation({
+                                    donation,
+                                    recipientName: dName,
+                                  });
+                                }}
+                              >
+                                ⭐ Rate Donor
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -1897,6 +2025,19 @@ export default function NgoDashboard() {
           </div>
         </div>
       )}
+
+      {/* Rating & Review Modal for NGO Rating Donors */}
+      <RatingModal
+        isOpen={!!ratingModalDonation}
+        onClose={() => setRatingModalDonation(null)}
+        donation={ratingModalDonation?.donation}
+        userRole="ngo"
+        recipientName={ratingModalDonation?.recipientName}
+        onSuccess={() => {
+          fetchUserRatings();
+          fetchData();
+        }}
+      />
     </div>
   );
 }

@@ -6,6 +6,9 @@ import api from '../api/axios';
 import { showToast } from '../components/Toast';
 import StatusBadge from '../components/StatusBadge';
 import { getSocket } from '../services/socket';
+import StarRating from '../components/StarRating';
+import RatingSummary from '../components/RatingSummary';
+import ReviewsList from '../components/ReviewsList';
 
 const TABS = [
   { id: 'overview', icon: '📊', label: 'Overview' },
@@ -14,6 +17,7 @@ const TABS = [
   { id: 'users', icon: '👥', label: 'Users' },
   { id: 'ngos', icon: '🏢', label: 'NGOs' },
   { id: 'ngo-requests', icon: '📋', label: 'NGO Requests' },
+  { id: 'ratings', icon: '⭐', label: 'Reputation & Ratings' },
   { id: 'support-tickets', icon: '🎧', label: 'Support Tickets' },
 ];
 
@@ -769,6 +773,16 @@ export default function AdminDashboard() {
   const [adminFulfillmentModal, setAdminFulfillmentModal] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('admin_sidebar_collapsed') === 'true');
 
+  // Lowest Rated NGOs State
+  const [lowestRatedNgos, setLowestRatedNgos] = useState([]);
+  const [loadingRatings, setLoadingRatings] = useState(false);
+  const [ratingsPage, setRatingsPage] = useState(1);
+  const [ratingsTotalPages, setRatingsTotalPages] = useState(1);
+  const [ratingsMinThreshold, setRatingsMinThreshold] = useState(1);
+  const [ratingsTotal, setRatingsTotal] = useState(0);
+  const [unratedNgosCount, setUnratedNgosCount] = useState(0);
+  const [selectedNgoForReviews, setSelectedNgoForReviews] = useState(null);
+
   const toggleSidebar = () => {
     const val = !sidebarCollapsed;
     setSidebarCollapsed(val);
@@ -918,6 +932,23 @@ export default function AdminDashboard() {
     };
   }, [fetchDonations, fetchNgoRequests, fetchStats]);
 
+  const fetchLowestRatedNgos = useCallback(async (page = 1, minCount = ratingsMinThreshold) => {
+    setLoadingRatings(true);
+    try {
+      const res = await api.get(`/aahar/ratings/admin/lowest-rated-ngos?minRatings=${minCount}&page=${page}&limit=10`);
+      setLowestRatedNgos(res.data?.ngos || []);
+      setRatingsTotal(res.data?.totalNgos || 0);
+      setUnratedNgosCount(res.data?.unratedNgosCount || 0);
+      setRatingsPage(res.data?.page || page);
+      setRatingsTotalPages(res.data?.totalPages || 1);
+    } catch (err) {
+      console.error("Error fetching lowest rated NGOs:", err);
+      showToast("Could not load rating records", "error");
+    } finally {
+      setLoadingRatings(false);
+    }
+  }, [ratingsMinThreshold]);
+
   // Auto-refresh relevant data when switching tabs
   const handleTabChange = useCallback((newTab) => {
     setTab(newTab);
@@ -925,8 +956,9 @@ export default function AdminDashboard() {
     if (newTab === 'ngo-requests') fetchNgoRequests();
     if (newTab === 'donations') fetchDonations();
     if (newTab === 'users') fetchUsers();
+    if (newTab === 'ratings') fetchLowestRatedNgos(1);
     if (newTab === 'support-tickets') fetchSupportTickets();
-  }, [fetchNgos, fetchNgoRequests, fetchDonations, fetchUsers, fetchSupportTickets]);
+  }, [fetchNgos, fetchNgoRequests, fetchDonations, fetchUsers, fetchLowestRatedNgos, fetchSupportTickets]);
 
   // User actions
   const makeAdmin = async (id) => { try { await api.put(`/aahar/admin/users/${id}/make-admin`); showToast('User promoted to Admin', 'success'); fetchUsers(); } catch { showToast('Failed', 'error'); } };
@@ -1912,7 +1944,10 @@ export default function AdminDashboard() {
                     <div className="ngo-admin-card__info">
                       <div className="ngo-admin-card__avatar">🏢</div>
                       <div>
-                        <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 4 }}>{ngo.ngoName}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 800, fontSize: '1rem' }}>{ngo.ngoName}</span>
+                          <RatingSummary targetId={ngo._id} role="ngo" compact />
+                        </div>
                         <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 2 }}>{ngo.ngoEmail}</div>
                         <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                           📍 {ngo.ngoCity}, {ngo.ngoState} · {ngo.ngoPurpose}
@@ -2444,6 +2479,275 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* ─── LOWEST RATED NGOS / RATINGS AUDIT ─── */}
+        {tab === 'ratings' && (
+          <div style={{ animation: 'fadeInUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Header Card */}
+            <div
+              style={{
+                padding: '24px 28px',
+                background: 'var(--bg-card, #111827)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-lg, 16px)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 16,
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span>⭐</span> Lowest-Rated NGOs Audit
+                </h3>
+                <p style={{ margin: '6px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Ranked upward by donor reviews to identify partner NGOs needing quality improvement or operational review.
+                </p>
+              </div>
+
+              {/* Controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  <span>Min Reviews:</span>
+                  <select
+                    className="form-input"
+                    value={ratingsMinThreshold}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setRatingsMinThreshold(val);
+                      fetchLowestRatedNgos(1, val);
+                    }}
+                    style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)' }}
+                  >
+                    <option value={1}>At least 1 review</option>
+                    <option value={2}>At least 2 reviews</option>
+                    <option value={3}>At least 3 reviews</option>
+                    <option value={5}>At least 5 reviews</option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => fetchLowestRatedNgos(ratingsPage, ratingsMinThreshold)}
+                  style={{ fontSize: '0.85rem' }}
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              <div style={{ padding: 18, background: 'var(--glass-bg)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Audited Rated NGOs</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{ratingsTotal}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>Meeting ≥ {ratingsMinThreshold} review threshold</div>
+              </div>
+
+              <div style={{ padding: 18, background: 'var(--glass-bg)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Critically Low (&lt; 3.0 ★)</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f87171', marginTop: 4 }}>
+                  {lowestRatedNgos.filter((n) => n.averageRating < 3.0).length}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>Requires administrative review</div>
+              </div>
+
+              <div style={{ padding: 18, background: 'var(--glass-bg)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Unrated Approved NGOs</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--color-teal)', marginTop: 4 }}>{unratedNgosCount}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>Excluded from ranking (handled separately)</div>
+              </div>
+            </div>
+
+            {/* Table */}
+            {loadingRatings ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="skeleton" style={{ height: 60, borderRadius: 'var(--radius-md)' }} />
+                ))}
+              </div>
+            ) : lowestRatedNgos.length === 0 ? (
+              <div className="empty-state" style={{ padding: 48, background: 'var(--glass-bg)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+                <div className="empty-state__icon">⭐</div>
+                <h3 className="empty-state__title">No Low-Rated NGOs Found</h3>
+                <p className="empty-state__text">
+                  There are currently no partner NGOs matching the minimum threshold of {ratingsMinThreshold} review{ratingsMinThreshold > 1 ? 's' : ''}.
+                </p>
+              </div>
+            ) : (
+              <div className="table-container" style={{ background: 'var(--glass-bg)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 60 }}>Rank</th>
+                      <th>NGO Partner</th>
+                      <th>Location</th>
+                      <th>Contact</th>
+                      <th>Average Rating</th>
+                      <th>Total Reviews</th>
+                      <th>Standing</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lowestRatedNgos.map((item, idx) => {
+                      const rank = (ratingsPage - 1) * 10 + (idx + 1);
+                      const avg = Number(item.averageRating || 0).toFixed(1);
+                      const isCritical = item.averageRating < 3.0;
+                      const isMediocre = item.averageRating >= 3.0 && item.averageRating < 4.0;
+
+                      return (
+                        <tr key={item._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td>
+                            <strong style={{ color: rank <= 3 ? '#f87171' : 'var(--text-muted)' }}>
+                              #{rank}
+                            </strong>
+                          </td>
+                          <td>
+                            <div>
+                              <strong style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>{item.ngoName}</strong>
+                              {item.ngoWebsite && (
+                                <a
+                                  href={item.ngoWebsite}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{ display: 'block', fontSize: '0.72rem', color: 'var(--color-teal)' }}
+                                >
+                                  🔗 {item.ngoWebsite.replace(/^https?:\/\//, '')}
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                            📍 {item.ngoCity}, {item.ngoState}
+                          </td>
+                          <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                            <div>✉️ {item.ngoEmail}</div>
+                            {item.ngoPhone && <div>📞 {item.ngoPhone}</div>}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <StarRating rating={item.averageRating} readOnly size="xs" />
+                              <strong
+                                style={{
+                                  fontSize: '0.95rem',
+                                  color: isCritical ? '#f87171' : isMediocre ? '#fbbf24' : '#4ade80',
+                                }}
+                              >
+                                {avg}
+                              </strong>
+                            </div>
+                          </td>
+                          <td>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: 99,
+                                fontSize: '0.78rem',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: 'var(--text-secondary)',
+                              }}
+                            >
+                              {item.totalRatings} review{item.totalRatings !== 1 ? 's' : ''}
+                            </span>
+                          </td>
+                          <td>
+                            {isCritical ? (
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '3px 8px',
+                                  borderRadius: 6,
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  color: '#f87171',
+                                  fontWeight: 700,
+                                }}
+                              >
+                                ⚠️ Quality Review
+                              </span>
+                            ) : isMediocre ? (
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '3px 8px',
+                                  borderRadius: 6,
+                                  background: 'rgba(251, 191, 36, 0.15)',
+                                  color: '#fbbf24',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ⚡ Below Average
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '3px 8px',
+                                  borderRadius: 6,
+                                  background: 'rgba(34, 197, 94, 0.15)',
+                                  color: '#4ade80',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ✓ Good Standing
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{
+                                fontSize: '0.78rem',
+                                padding: '5px 12px',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                              }}
+                              onClick={() => setSelectedNgoForReviews(item)}
+                            >
+                              💬 View Reviews
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {ratingsTotalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Page {ratingsPage} of {ratingsTotalPages} ({ratingsTotal} total NGOs)
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={ratingsPage <= 1 || loadingRatings}
+                    onClick={() => fetchLowestRatedNgos(ratingsPage - 1)}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                  >
+                    ← Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={ratingsPage >= ratingsTotalPages || loadingRatings}
+                    onClick={() => fetchLowestRatedNgos(ratingsPage + 1)}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Reject Modal (Donations) */}
@@ -2900,6 +3204,42 @@ export default function AdminDashboard() {
 
             <div className="modal__actions" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 16, justifyContent: 'center' }}>
               <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setAdminFulfillmentModal(null)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NGO Reviews Inspection Modal */}
+      {selectedNgoForReviews && (
+        <div className="modal-overlay" onClick={() => setSelectedNgoForReviews(null)} style={{ zIndex: 120 }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, width: '92%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <h3 className="modal__title" style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>🏢</span> {selectedNgoForReviews.ngoName}
+                </h3>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                  📍 {selectedNgoForReviews.ngoCity}, {selectedNgoForReviews.ngoState} · {selectedNgoForReviews.ngoEmail}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedNgoForReviews(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '1.4rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <RatingSummary targetId={selectedNgoForReviews._id} role="ngo" title="Donor Reputation Summary" />
+              <ReviewsList targetId={selectedNgoForReviews._id} role="ngo" title="Detailed Donor Reviews" pageSize={5} />
+            </div>
+
+            <div className="modal__actions" style={{ marginTop: 20, borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
+              <button className="btn-ghost" onClick={() => setSelectedNgoForReviews(null)}>
+                Close
+              </button>
             </div>
           </div>
         </div>

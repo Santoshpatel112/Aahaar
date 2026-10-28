@@ -5,6 +5,9 @@ import api from '../api/axios';
 import { showToast } from '../components/Toast';
 import StatusBadge from '../components/StatusBadge';
 import { useWallet } from '../context/WalletContext';
+import RatingModal from '../components/RatingModal';
+import RatingSummary from '../components/RatingSummary';
+import ReviewsList from '../components/ReviewsList';
 
 function SkeletonStatCard() {
   return (
@@ -96,9 +99,25 @@ export default function DonorDashboard() {
   const [panValue, setPanValue] = useState(user?.panNumber || '');
   const [savingPan, setSavingPan] = useState(false);
   const [panFile, setPanFile] = useState(null);
-
+  const [ratingModalDonation, setRatingModalDonation] = useState(null);
+  const [userRatingsMap, setUserRatingsMap] = useState({});
 
   const donorId = user?._id || user?.id;
+
+  const fetchUserRatings = useCallback(async () => {
+    try {
+      const res = await api.get('/aahar/ratings/me');
+      const list = res.data?.ratings || [];
+      const map = {};
+      list.forEach((r) => {
+        const dId = r.donation?._id || r.donation;
+        if (dId) map[String(dId)] = r;
+      });
+      setUserRatingsMap(map);
+    } catch (err) {
+      console.error('Error fetching user ratings:', err);
+    }
+  }, []);
 
   const fetchNgoRequestsData = useCallback(async () => {
     try {
@@ -118,13 +137,13 @@ export default function DonorDashboard() {
       const res = await api.get(`/aahar/user-stats/getDashboardStats/${donorId}`);
       const data = res.data?.data || res.data;
       setDonations(data?.recentDonations || data?.donations || []);
-      await fetchNgoRequestsData();
+      await Promise.all([fetchNgoRequestsData(), fetchUserRatings()]);
     } catch {
       showToast('Could not load your donations', 'error');
     } finally {
       setLoading(false);
     }
-  }, [donorId, fetchNgoRequestsData]);
+  }, [donorId, fetchNgoRequestsData, fetchUserRatings]);
 
   useEffect(() => {
     let active = true;
@@ -787,6 +806,14 @@ export default function DonorDashboard() {
           ))}
         </div>
 
+        {/* Donor Reputation & Reviews */}
+        {donorId && (
+          <div style={{ marginBottom: 28, display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 1fr', gap: 20 }}>
+            <RatingSummary targetId={donorId} role="donor" title="My Donor Reputation (From NGOs)" />
+            <ReviewsList targetId={donorId} role="donor" title="NGO Feedback & Reviews" pageSize={3} />
+          </div>
+        )}
+
         {/* Donations Section */}
         <div className="dashboard-section">
           <div className="dashboard-section__header">
@@ -899,28 +926,73 @@ export default function DonorDashboard() {
                       </button>
                     )}
                     {normalizeStatusForFilter(donation.status) === 'done' && (
-                      <button 
-                        className="btn-teal" 
-                        style={{ 
-                          fontSize: '0.8rem', 
-                          padding: '7px 14px', 
-                          background: user?.isPanVerified ? 'var(--grad-teal)' : 'rgba(255,255,255,0.05)', 
-                          border: user?.isPanVerified ? 'none' : '1px solid var(--border-color)', 
-                          color: user?.isPanVerified ? '#fff' : 'var(--text-muted)',
-                          cursor: user?.isPanVerified ? 'pointer' : 'not-allowed'
-                        }}
-                        onClick={() => {
-                          if (!user?.isPanVerified) {
-                            showToast('PAN verification is required to download Section 80G tax receipts.', 'warning');
-                            return;
-                          }
-                          handleDownloadReceipt(donation._id);
-                        }}
-                        disabled={downloadingReceiptId === donation._id}
-                        title={!user?.isPanVerified ? "Verify PAN in Profile to download receipt" : "Download Tax Exemption Receipt"}
-                      >
-                        {downloadingReceiptId === donation._id ? '⏳ Downloading...' : '📄 Download Receipt'}
-                      </button>
+                      <>
+                        {userRatingsMap[donation._id] ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              fontSize: '0.8rem',
+                              padding: '6px 12px',
+                              background: 'rgba(251, 191, 36, 0.1)',
+                              border: '1px solid rgba(251, 191, 36, 0.3)',
+                              borderRadius: 'var(--radius-md)',
+                              color: '#fbbf24',
+                              fontWeight: 600,
+                            }}
+                            title={`You rated this ${userRatingsMap[donation._id].rating}★`}
+                          >
+                            ⭐ Rated ({userRatingsMap[donation._id].rating}★)
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            style={{
+                              fontSize: '0.8rem',
+                              padding: '7px 14px',
+                              background: 'var(--grad-primary)',
+                              border: 'none',
+                              color: '#fff',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-md)',
+                            }}
+                            onClick={() => {
+                              const ngoName = donation.pickedUpByNgo?.ngoName || (typeof donation.ngoPreference === 'object' ? donation.ngoPreference?.ngoName : 'Assigned NGO');
+                              setRatingModalDonation({
+                                donation,
+                                recipientName: ngoName,
+                              });
+                            }}
+                          >
+                            ⭐ Rate NGO
+                          </button>
+                        )}
+                        <button 
+                          className="btn-teal" 
+                          style={{ 
+                            fontSize: '0.8rem', 
+                            padding: '7px 14px', 
+                            background: user?.isPanVerified ? 'var(--grad-teal)' : 'rgba(255,255,255,0.05)', 
+                            border: user?.isPanVerified ? 'none' : '1px solid var(--border-color)', 
+                            color: user?.isPanVerified ? '#fff' : 'var(--text-muted)',
+                            cursor: user?.isPanVerified ? 'pointer' : 'not-allowed'
+                          }}
+                          onClick={() => {
+                            if (!user?.isPanVerified) {
+                              showToast('PAN verification is required to download Section 80G tax receipts.', 'warning');
+                              return;
+                            }
+                            handleDownloadReceipt(donation._id);
+                          }}
+                          disabled={downloadingReceiptId === donation._id}
+                          title={!user?.isPanVerified ? "Verify PAN in Profile to download receipt" : "Download Tax Exemption Receipt"}
+                        >
+                          {downloadingReceiptId === donation._id ? '⏳ Downloading...' : '📄 Download Receipt'}
+                        </button>
+                      </>
                     )}
                   </div>
 
@@ -997,7 +1069,7 @@ export default function DonorDashboard() {
                     </div>
                   )}
 
-                  {!['fulfilled', 'completed', 'done'].includes((ful.status || '').toLowerCase()) && (
+                  {!['fulfilled', 'completed', 'done'].includes((ful.status || '').toLowerCase()) ? (
                     <div className="donation-card__actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
                       <button 
                         className="btn-teal" 
@@ -1006,6 +1078,42 @@ export default function DonorDashboard() {
                       >
                         🔑 Delivery Pass
                       </button>
+                    </div>
+                  ) : (
+                    <div className="donation-card__actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                      {userRatingsMap[ful._id] ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontSize: '0.8rem',
+                            padding: '6px 12px',
+                            background: 'rgba(251, 191, 36, 0.1)',
+                            border: '1px solid rgba(251, 191, 36, 0.3)',
+                            borderRadius: 'var(--radius-md)',
+                            color: '#fbbf24',
+                            fontWeight: 600,
+                          }}
+                          title={`You rated this ${userRatingsMap[ful._id].rating}★`}
+                        >
+                          ⭐ Rated ({userRatingsMap[ful._id].rating}★)
+                        </span>
+                      ) : (
+                        <button 
+                          className="btn-primary" 
+                          style={{ fontSize: '0.8rem', padding: '7px 14px', background: 'var(--grad-primary)', border: 'none', color: '#fff', fontWeight: 700, cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
+                          onClick={() => {
+                            const ngoName = ful.contactDetails?.contactPersonName || ful.ngoId?.ngoName || 'NGO Partner';
+                            setRatingModalDonation({
+                              donation: ful,
+                              recipientName: ngoName,
+                            });
+                          }}
+                        >
+                          ⭐ Rate NGO
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1320,37 +1428,96 @@ export default function DonorDashboard() {
               )}
             </div>
 
-            <div className="modal__actions" style={{ marginTop: 24, borderTop: '1px solid var(--border-color)', paddingTop: 14, justifyContent: 'flex-end', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, borderTop: '1px solid var(--border-color)', paddingTop: 16, flexWrap: 'wrap' }}>
               {normalizeStatusForFilter(viewDetails.status) === 'done' && (
-                <button 
-                  className="btn-teal" 
-                  style={{ 
-                    fontSize: '0.85rem', 
-                    padding: '8px 18px', 
-                    background: user?.isPanVerified ? 'var(--grad-teal)' : 'rgba(255,255,255,0.05)', 
-                    border: user?.isPanVerified ? 'none' : '1px solid var(--border-color)', 
-                    color: user?.isPanVerified ? '#fff' : 'var(--text-muted)',
-                    cursor: user?.isPanVerified ? 'pointer' : 'not-allowed'
-                  }}
-                  onClick={() => { 
-                    if (!user?.isPanVerified) {
-                      showToast('PAN verification is required to download Section 80G tax receipts.', 'warning');
-                      return;
-                    }
-                    handleDownloadReceipt(viewDetails._id); 
-                    setViewDetails(null); 
-                  }}
-                  disabled={downloadingReceiptId === viewDetails._id}
-                  title={!user?.isPanVerified ? "Verify PAN in Profile to download receipt" : "Download Tax Exemption Receipt"}
-                >
-                  {downloadingReceiptId === viewDetails._id ? '⏳ Downloading...' : '📄 Download Receipt'}
-                </button>
+                <>
+                  {userRatingsMap[viewDetails._id] ? (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: '0.85rem',
+                        padding: '8px 14px',
+                        background: 'rgba(251, 191, 36, 0.1)',
+                        border: '1px solid rgba(251, 191, 36, 0.3)',
+                        borderRadius: 'var(--radius-md)',
+                        color: '#fbbf24',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ⭐ Rated ({userRatingsMap[viewDetails._id].rating}★)
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      style={{
+                        fontSize: '0.85rem',
+                        padding: '8px 18px',
+                        background: 'var(--grad-primary)',
+                        border: 'none',
+                        color: '#fff',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        borderRadius: 'var(--radius-md)',
+                      }}
+                      onClick={() => {
+                        const don = viewDetails;
+                        const ngoName = don.pickedUpByNgo?.ngoName || (typeof don.ngoPreference === 'object' ? don.ngoPreference?.ngoName : 'Assigned NGO');
+                        setViewDetails(null);
+                        setRatingModalDonation({
+                          donation: don,
+                          recipientName: ngoName,
+                        });
+                      }}
+                    >
+                      ⭐ Rate NGO
+                    </button>
+                  )}
+                  <button 
+                    className="btn-teal" 
+                    style={{ 
+                      fontSize: '0.85rem', 
+                      padding: '8px 18px', 
+                      background: user?.isPanVerified ? 'var(--grad-teal)' : 'rgba(255,255,255,0.05)', 
+                      border: user?.isPanVerified ? 'none' : '1px solid var(--border-color)', 
+                      color: user?.isPanVerified ? '#fff' : 'var(--text-muted)',
+                      cursor: user?.isPanVerified ? 'pointer' : 'not-allowed'
+                    }}
+                    onClick={() => { 
+                      if (!user?.isPanVerified) {
+                        showToast('PAN verification is required to download Section 80G tax receipts.', 'warning');
+                        return;
+                      }
+                      handleDownloadReceipt(viewDetails._id); 
+                      setViewDetails(null); 
+                    }}
+                    disabled={downloadingReceiptId === viewDetails._id}
+                    title={!user?.isPanVerified ? "Verify PAN in Profile to download receipt" : "Download Tax Exemption Receipt"}
+                  >
+                    {downloadingReceiptId === viewDetails._id ? '⏳ Downloading...' : '📄 Download Receipt'}
+                  </button>
+                </>
               )}
               <button className="btn-ghost" onClick={() => setViewDetails(null)}>Close</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Rating & Review Modal */}
+      <RatingModal
+        isOpen={!!ratingModalDonation}
+        onClose={() => setRatingModalDonation(null)}
+        donation={ratingModalDonation?.donation}
+        userRole="donor"
+        recipientName={ratingModalDonation?.recipientName}
+        onSuccess={() => {
+          fetchUserRatings();
+          fetchData();
+        }}
+      />
     </div>
   );
 }
