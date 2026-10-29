@@ -404,7 +404,7 @@ const sendOTP = asyncHandler(async (req, res) => {
   const userExists = await User.findOne({ email: normalizedEmail });
   if (userExists) {
     res.status(400);
-    throw new Error("User already exists");
+    throw new Error("An account already exists with this email address. Please click Login instead.");
   }
 
   // Generate 6-digit OTP
@@ -415,10 +415,16 @@ const sendOTP = asyncHandler(async (req, res) => {
   await OTP.create({ email: normalizedEmail, otp });
 
   // Send email and check delivery result
-  const emailSent = await sendOTPEmail(normalizedEmail, otp);
+  let emailSent = false;
+  try {
+    emailSent = await sendOTPEmail(normalizedEmail, otp);
+  } catch (mailErr) {
+    console.error(`[OTP EMAIL ERROR] Error during dispatch to ${normalizedEmail}:`, mailErr.message);
+  }
 
   if (!emailSent) {
-    console.warn(`[OTP DELIVERY WARNING] Physical email dispatch failed for ${normalizedEmail}. OTP stored in MongoDB: ${otp}`);
+    res.status(500);
+    throw new Error("Failed to send verification email. Please verify your email configuration or try again.");
   }
 
   res.status(200).json({ 

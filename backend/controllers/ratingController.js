@@ -10,7 +10,7 @@ import { notify } from "../services/notification.service.js";
 /**
  * Helper to determine if a status string signifies donation completion
  */
-const isCompletedStatus = (status) => {
+export const isCompletedStatus = (status) => {
   if (!status) return false;
   const s = String(status).trim().toUpperCase();
   return ["COMPLETED", "DONE", "FULFILLED"].includes(s);
@@ -19,7 +19,7 @@ const isCompletedStatus = (status) => {
 /**
  * Resolve participant identities from a donation document
  */
-const resolveDonationParticipants = async (donation) => {
+export const resolveDonationParticipants = async (donation) => {
   let donorId = null;
   let ngoId = null;
   let ngoRegisteredBy = null;
