@@ -49,6 +49,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   const [otpCode, setOtpCode] = useState('');
+  const [devOtpNotice, setDevOtpNotice] = useState('');
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
 
@@ -119,7 +120,17 @@ export default function RegisterPage() {
 
     if (res.success) {
       setShowOtpInput(true);
-      showToast(res.message || 'Verification OTP code sent to your email.', 'success');
+      if (res.devOtp) {
+        setDevOtpNotice(res.devOtp);
+        setOtpCode(res.devOtp);
+      } else {
+        setDevOtpNotice('');
+      }
+      if (res.isDevFallback) {
+        showToast(`Testing Mode: Real email delivery restricted. OTP auto-filled: ${res.devOtp}`, 'info');
+      } else {
+        showToast(res.message || 'Verification OTP code sent to your email.', 'success');
+      }
     } else {
       showToast(res.error || 'Failed to send OTP code', 'error');
       setErrors({ email: res.error });
@@ -351,6 +362,37 @@ export default function RegisterPage() {
 
               {showOtpInput && (
                 <div className="form-group" style={{ animation: 'fadeInUp 0.3s ease', marginTop: 12 }}>
+                  {devOtpNotice && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'rgba(249, 115, 22, 0.1)',
+                      border: '1px solid rgba(249, 115, 22, 0.3)',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      marginBottom: '12px',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary)'
+                    }}>
+                      <span>⚡ <strong>Testing OTP:</strong> <span style={{ color: '#f97316', fontWeight: 800, letterSpacing: '2px', marginLeft: 4 }}>{devOtpNotice}</span></span>
+                      <button
+                        type="button"
+                        onClick={() => setOtpCode(devOtpNotice)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#f97316',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '0.8rem',
+                          textDecoration: 'underline'
+                        }}
+                      >
+                        Auto-Fill
+                      </button>
+                    </div>
+                  )}
                   <label className="form-label">Verification OTP Code (Sent to your email)</label>
                   <input
                     type="text"

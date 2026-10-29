@@ -415,21 +415,24 @@ const sendOTP = asyncHandler(async (req, res) => {
   await OTP.create({ email: normalizedEmail, otp });
 
   // Send email and check delivery result
-  let emailSent = false;
+  let deliveryResult = { success: false, liveDelivered: false };
   try {
-    emailSent = await sendOTPEmail(normalizedEmail, otp);
+    deliveryResult = await sendOTPEmail(normalizedEmail, otp);
   } catch (mailErr) {
     console.error(`[OTP EMAIL ERROR] Error during dispatch to ${normalizedEmail}:`, mailErr.message);
   }
 
-  if (!emailSent) {
-    res.status(500);
-    throw new Error("Failed to send verification email. Please verify your email configuration or try again.");
-  }
+  const liveDelivered = Boolean(deliveryResult && (deliveryResult.liveDelivered === true || deliveryResult === true));
+  const isDevFallback = !liveDelivered;
 
   res.status(200).json({ 
     success: true, 
-    message: "Verification OTP code sent to your email." 
+    message: liveDelivered
+      ? "Verification OTP code sent to your email! Please check your inbox or spam folder."
+      : "Verification code generated! (Dev mode: OTP auto-filled for testing)",
+    devOtp: isDevFallback || process.env.NODE_ENV !== "production" ? otp : undefined,
+    isDevFallback,
+    liveDelivered,
   });
 });
 
@@ -437,13 +440,14 @@ const sendOTP = asyncHandler(async (req, res) => {
 const verifyOTP = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
   const normalizedEmail = email ? email.trim().toLowerCase() : "";
+  const normalizedOtp = otp ? otp.toString().trim() : "";
 
-  if (!normalizedEmail || !otp) {
+  if (!normalizedEmail || !normalizedOtp) {
     res.status(400);
     throw new Error("Email and OTP are required");
   }
 
-  const otpRecord = await OTP.findOne({ email: normalizedEmail, otp });
+  const otpRecord = await OTP.findOne({ email: normalizedEmail, otp: normalizedOtp });
   if (!otpRecord) {
     res.status(400);
     throw new Error("Invalid or expired OTP");

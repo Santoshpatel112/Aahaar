@@ -76,7 +76,9 @@ export function AuthProvider({ children }) {
       return { 
         success: true, 
         message: res.data?.message || 'OTP sent successfully.',
-        devOtp: res.data?.devOtp
+        devOtp: res.data?.devOtp,
+        isDevFallback: res.data?.isDevFallback,
+        liveDelivered: res.data?.liveDelivered,
       };
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data || 'Failed to send OTP.';
