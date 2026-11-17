@@ -181,6 +181,25 @@ function ReviewDetailsModal({ donation, onApprove, onReject, onMarkAsDone, onClo
             );
           })()}
 
+          {/* Delivery Handover Photo Proof for Audit */}
+          {donation.deliveryProofPhoto && (
+            <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 8, padding: '12px 14px', fontSize: '0.85rem' }}>
+              <h4 style={{ fontSize: '0.9rem', color: '#10b981', fontWeight: 700, margin: '0 0 8px' }}>📸 Drop-off Verification Proof</h4>
+              <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                <img src={donation.deliveryProofPhoto} alt="Carton Proof" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-color)' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Verified Cartons Drop-off</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                    {donation.deliveryHandoverCompletedAt || donation.completedAt ? new Date(donation.deliveryHandoverCompletedAt || donation.completedAt).toLocaleString('en-IN') : 'Completed'}
+                  </div>
+                  <a href={donation.deliveryProofPhoto} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: 'var(--color-teal)', display: 'inline-block', marginTop: 4, fontWeight: 600 }}>
+                    Open Full Photo ↗
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Food Items List */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1743,8 +1762,15 @@ export default function AdminDashboard() {
                         {/* Completion info */}
                         {(sNorm === 'DONE' || sNorm === 'COMPLETED') && (
                           <div style={{ padding: '8px 12px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 8, fontSize: '0.82rem', color: '#4ade80', marginBottom: 14 }}>
-                            ✅ Completed at: {d.completedAt ? new Date(d.completedAt).toLocaleString('en-IN') : '—'}
-                            {d.pickedUpByNgo?.ngoName && ` · Picked up by ${d.pickedUpByNgo.ngoName}`}
+                            <div>✅ Completed at: {d.completedAt ? new Date(d.completedAt).toLocaleString('en-IN') : '—'}</div>
+                            {d.pickedUpByNgo?.ngoName && <div>· Picked up by {d.pickedUpByNgo.ngoName}</div>}
+                            {d.deliveryProofPhoto && (
+                              <div style={{ marginTop: 6 }}>
+                                <a href={d.deliveryProofPhoto} target="_blank" rel="noreferrer" style={{ color: '#34d399', textDecoration: 'underline', fontWeight: 600 }}>
+                                  📸 View Handover Verification Photo Proof ↗
+                                </a>
+                              </div>
+                            )}
                           </div>
                         )}
 

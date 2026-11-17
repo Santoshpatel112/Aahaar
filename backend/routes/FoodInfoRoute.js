@@ -1,4 +1,18 @@
-import {CreateFoodInfo,getFoodInfoById,updateFoodInfo,deleteFoodInfo,uploadFoodImages as uploadFoodImagesController,verifyDonationPickup,getNgoAssignedDonations,acceptDirectDonation,rejectDirectDonation,downloadDonationReceipt} from "../controllers/foodInfoController.js"
+import {
+    CreateFoodInfo,
+    getFoodInfoById,
+    updateFoodInfo,
+    deleteFoodInfo,
+    uploadFoodImages as uploadFoodImagesController,
+    verifyDonationPickup,
+    getNgoAssignedDonations,
+    acceptDirectDonation,
+    rejectDirectDonation,
+    downloadDonationReceipt,
+    getNgoIncomingDropoffs,
+    getActiveDeliveriesForVolunteer,
+    verifyDeliveryHandover
+} from "../controllers/foodInfoController.js"
 import { protect } from "../middlewares/authMiddleware.js";
 import express from "express";
 import { uploadFoodImages } from "../s3Config.js";
@@ -16,4 +30,10 @@ router.route('/my-assigned-donations').get(protect,getNgoAssignedDonations);
 router.route('/accept-donation/:id').put(protect,acceptDirectDonation);
 router.route('/reject-donation/:id').put(protect,rejectDirectDonation);
 router.route('/receipt/:id').get(protect, downloadDonationReceipt);
+
+// Volunteer & Recipient Handover routes
+router.route('/handover/ngo-incoming').get(protect, getNgoIncomingDropoffs);
+router.route('/handover/active').get(protect, getActiveDeliveriesForVolunteer);
+router.route('/handover/verify/:id').post(protect, uploadFoodImages.single('dropoffPhoto'), verifyDeliveryHandover);
+
 export default router;

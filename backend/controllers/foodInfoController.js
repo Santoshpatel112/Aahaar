@@ -11,19 +11,19 @@ import { generateAndEmailReceipt } from "../services/taxService.js";
 const uploadFoodImages = asyncHandler(async (req, res) => {
     const files = req.files;
     if (files && files.foodImage) {
-      const imageUrls = files.foodImage.map(file => getFileUrl(file));
-      res.status(200).json({
-        message: "Food images uploaded successfully",
-        imageUrls,
-      });
+        const imageUrls = files.foodImage.map(file => getFileUrl(file));
+        res.status(200).json({
+            message: "Food images uploaded successfully",
+            imageUrls,
+        });
     } else {
-      res.status(400).json({
-        message: "No images uploaded",
-      });
+        res.status(400).json({
+            message: "No images uploaded",
+        });
     }
 });
 
-const CreateFoodInfo=asyncHandler(async(req , res)=>{
+const CreateFoodInfo = asyncHandler(async (req, res) => {
     if (!req.user || !req.user.isVerified) {
         res.status(403);
         throw new Error("Only Aadhaar-verified users can create food donations");
@@ -37,29 +37,29 @@ const CreateFoodInfo=asyncHandler(async(req , res)=>{
         contactPersonName,
         phoneNumber,
         email
-    }=req.body;
+    } = req.body;
 
-    if(!foodItemDetails || !Array.isArray(foodItemDetails) || foodItemDetails.length === 0 || 
-       !fullAddress || !city || !contactPersonName || !phoneNumber || !email){
+    if (!foodItemDetails || !Array.isArray(foodItemDetails) || foodItemDetails.length === 0 ||
+        !fullAddress || !city || !contactPersonName || !phoneNumber || !email) {
         res.status(400);
         throw new Error("All required fields are missing");
     }
 
-    for(const item of foodItemDetails) {
+    for (const item of foodItemDetails) {
         item.donorId = req.user._id;
-        
-        if(item.imageUrl && !Array.isArray(item.imageUrl)) {
+
+        if (item.imageUrl && !Array.isArray(item.imageUrl)) {
             res.status(400);
             throw new Error("imageUrl must be an array");
         }
-        
+
         const expiryDate = new Date(item.expiryDate);
-        if(isNaN(expiryDate.getTime())) {
+        if (isNaN(expiryDate.getTime())) {
             res.status(400);
             throw new Error("Invalid expiry date format");
         }
-        
-        if(item.quantity <= 0) {
+
+        if (item.quantity <= 0) {
             res.status(400);
             throw new Error("Quantity must be greater than 0");
         }
@@ -91,11 +91,11 @@ const CreateFoodInfo=asyncHandler(async(req , res)=>{
     const initialStatus = isDirectDonation ? 'PENDING_NGO_ACCEPTANCE' : 'pending';
 
     // Cast ngoPreference to ObjectId when it's a valid NGO ID (not 'random')
-    const ngoPreferenceValue = isDirectDonation 
-        ? new mongoose.Types.ObjectId(ngoPreference) 
+    const ngoPreferenceValue = isDirectDonation
+        ? new mongoose.Types.ObjectId(ngoPreference)
         : ngoPreference;
 
-    const foodInfo=await FoodInfo.create({
+    const foodInfo = await FoodInfo.create({
         foodItemDetails,
         contactDetails,
         ngoPreference: ngoPreferenceValue,
@@ -107,8 +107,8 @@ const CreateFoodInfo=asyncHandler(async(req , res)=>{
         receiverId: req.user._id,
         receiverRole: 'donor',
         title: 'Donation Submitted',
-        message: isDirectDonation 
-            ? 'Your food donation has been submitted directly to the preferred NGO.' 
+        message: isDirectDonation
+            ? 'Your food donation has been submitted directly to the preferred NGO.'
             : 'Your food donation has been submitted and is pending review.',
         type: 'DONATION_CREATED',
         entityType: 'FoodInfo',
@@ -160,20 +160,20 @@ const CreateFoodInfo=asyncHandler(async(req , res)=>{
         }
     }
 
-   return res.status(201).json({foodInfo,message:"Food info created successfully"});
+    return res.status(201).json({ foodInfo, message: "Food info created successfully" });
 })
 
-const getFoodInfoById=asyncHandler(async(req ,res)=>{
-    const {id}=req.params;
-    const foodInfo=await FoodInfo.findById(id);
-    if(!foodInfo){
-        return res.status(404).json({message:"Food info not found"});
+const getFoodInfoById = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const foodInfo = await FoodInfo.findById(id);
+    if (!foodInfo) {
+        return res.status(404).json({ message: "Food info not found" });
     }
-    return res.status(200).json({foodInfo,message:"Food info fetched successfully"});
+    return res.status(200).json({ foodInfo, message: "Food info fetched successfully" });
 })
 
-const updateFoodInfo=asyncHandler(async(req ,res)=>{
-    const {id}=req.params;
+const updateFoodInfo = asyncHandler(async (req, res) => {
+    const { id } = req.params;
     const {
         foodItemDetails,
         fullAddress,
@@ -182,16 +182,16 @@ const updateFoodInfo=asyncHandler(async(req ,res)=>{
         phoneNumber,
         email,
         ngoPreference
-    }=req.body;
+    } = req.body;
 
-    if(!foodItemDetails || !Array.isArray(foodItemDetails) || foodItemDetails.length === 0 || 
-       !fullAddress || !city || !contactPersonName || !phoneNumber || !email){
+    if (!foodItemDetails || !Array.isArray(foodItemDetails) || foodItemDetails.length === 0 ||
+        !fullAddress || !city || !contactPersonName || !phoneNumber || !email) {
         res.status(400);
         throw new Error("All required fields are missing");
     }
 
-    for(const item of foodItemDetails) {
-        if(!item.foodName || !item.quantity || !item.quantityType || !item.expiryDate || !item.category) {
+    for (const item of foodItemDetails) {
+        if (!item.foodName || !item.quantity || !item.quantityType || !item.expiryDate || !item.category) {
             res.status(400);
             throw new Error("All food item details are required");
         }
@@ -206,12 +206,12 @@ const updateFoodInfo=asyncHandler(async(req ,res)=>{
     };
 
     const existingFoodInfo = await FoodInfo.findById(id);
-    
+
     if (!existingFoodInfo) {
         res.status(404);
         throw new Error("Food info not found");
     }
-    
+
     const foodInfo = await FoodInfo.findByIdAndUpdate(id, {
         foodItemDetails,
         contactDetails,
@@ -224,17 +224,17 @@ const updateFoodInfo=asyncHandler(async(req ,res)=>{
         rejectedAt: existingFoodInfo.rejectedAt,
         rejectedReason: existingFoodInfo.rejectedReason
     }, { new: true });
-    
-    return res.status(200).json({foodInfo,message:"Food info updated successfully"});
+
+    return res.status(200).json({ foodInfo, message: "Food info updated successfully" });
 })
 
-const deleteFoodInfo=asyncHandler(async(req ,res)=>{
-    const {id}=req.params;
-    const foodInfo=await FoodInfo.findByIdAndDelete(id);
-    if(!foodInfo){
-        return res.status(404).json({message:"Food info not found"});
+const deleteFoodInfo = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const foodInfo = await FoodInfo.findByIdAndDelete(id);
+    if (!foodInfo) {
+        return res.status(404).json({ message: "Food info not found" });
     }
-    return res.status(200).json({message:"Food info deleted successfully"});
+    return res.status(200).json({ message: "Food info deleted successfully" });
 })
 
 const verifyDonationPickup = asyncHandler(async (req, res) => {
@@ -287,14 +287,15 @@ const verifyDonationPickup = asyncHandler(async (req, res) => {
         }
 
         // If donation was made to a specific NGO, make sure it matches the scanning NGO
-        if (donation.ngoPreference.toString() !== userNgo._id.toString()) {            res.status(403);
+        if (donation.ngoPreference.toString() !== userNgo._id.toString()) {
+            res.status(403);
             throw new Error("This donation is assigned to a different NGO. You are not authorized to verify it.");
         }
     }
 
     donation.status = 'COMPLETED';
     donation.completedAt = new Date();
-    
+
     // Save which NGO picked up this food donation
     if (!req.user.isAdmin) {
         const userNgo = await Ngo.findOne({ registeredBy: req.user._id });
@@ -403,10 +404,20 @@ const getNgoAssignedDonations = asyncHandler(async (req, res) => {
             { pickedUpByNgo: userNgo._id }
         ]
     }).sort({ createdAt: -1 })
-      .populate({
-         path: 'foodItemDetails.donorId',
-         select: 'firstName surname email phone'
-      });
+        .populate({
+            path: 'foodItemDetails.donorId',
+            select: 'firstName surname email phone'
+        });
+
+    // Ensure active incoming drop-offs have a 4-digit handover confirmation code for recipient verification
+    for (const d of donations) {
+        const s = (d.status || '').toLowerCase();
+        const isActive = ['approved', 'ngo_accepted', 'request_accepted', 'pickup_in_progress'].includes(s);
+        if (isActive && (!d.deliveryHandoverCode || d.deliveryHandoverCode.length !== 4)) {
+            d.deliveryHandoverCode = Math.floor(1000 + Math.random() * 9000).toString();
+            await d.save();
+        }
+    }
 
     return res.status(200).json({
         donations,
@@ -556,7 +567,7 @@ const downloadDonationReceipt = asyncHandler(async (req, res) => {
         res.status(400);
         throw new Error("No donor associated with this donation");
     }
-    
+
     // Check authorization: only the donor or an admin can download
     if (req.user._id.toString() !== donorId.toString() && !req.user.isAdmin) {
         res.status(403);
@@ -607,8 +618,202 @@ export {
     getNgoAssignedDonations,
     acceptDirectDonation,
     rejectDirectDonation,
-    downloadDonationReceipt
+    downloadDonationReceipt,
+    getNgoIncomingDropoffs,
+    getActiveDeliveriesForVolunteer,
+    verifyDeliveryHandover
 };
+
+// ==========================================
+// VOLUNTEER HANDOVER & RECIPIENT VERIFICATION
+// ==========================================
+
+// Helper to generate a unique 4-digit confirmation code
+const generateUniqueFourDigitCode = async () => {
+    let code;
+    let exists = true;
+    while (exists) {
+        code = Math.floor(1000 + Math.random() * 9000).toString(); // e.g. "4829"
+        const found = await FoodInfo.findOne({
+            deliveryHandoverCode: code,
+            status: { $in: ['approved', 'APPROVED', 'NGO_ACCEPTED', 'PICKUP_IN_PROGRESS', 'REQUEST_ACCEPTED', 'pending'] }
+        });
+        if (!found) exists = false;
+    }
+    return code;
+};
+
+// Recipient NGO: Retrieve active incoming drop-offs with 4-digit confirmation codes
+const getNgoIncomingDropoffs = asyncHandler(async (req, res) => {
+    let ngoId = null;
+    if (!req.user.isAdmin) {
+        const ngo = await Ngo.findOne({ registeredBy: req.user._id });
+        if (!ngo) {
+            res.status(403);
+            throw new Error("Only approved NGO representatives or Admins can access incoming drop-offs");
+        }
+        ngoId = ngo._id;
+    }
+
+    const query = {
+        status: { $in: ['approved', 'APPROVED', 'NGO_ACCEPTED', 'PICKUP_IN_PROGRESS', 'REQUEST_ACCEPTED'] }
+    };
+    if (ngoId) {
+        query.$or = [
+            { ngoPreference: ngoId },
+            { pickedUpByNgo: ngoId }
+        ];
+    }
+
+    const dropoffs = await FoodInfo.find(query)
+        .populate('foodItemDetails.donorId', 'firstName surname email phone')
+        .populate('ngoPreference', 'ngoName address city phone')
+        .populate('pickedUpByNgo', 'ngoName address city phone')
+        .sort({ updatedAt: -1 });
+
+    // Ensure each active incoming drop-off has an assigned 4-digit confirmation code
+    for (const d of dropoffs) {
+        if (!d.deliveryHandoverCode || d.deliveryHandoverCode.length !== 4) {
+            d.deliveryHandoverCode = await generateUniqueFourDigitCode();
+            await d.save();
+        }
+    }
+
+    res.status(200).json({
+        success: true,
+        count: dropoffs.length,
+        dropoffs
+    });
+});
+
+// Volunteer: Retrieve active deliveries available for drop-off handover
+const getActiveDeliveriesForVolunteer = asyncHandler(async (req, res) => {
+    const activeDeliveries = await FoodInfo.find({
+        status: { $in: ['approved', 'APPROVED', 'NGO_ACCEPTED', 'PICKUP_IN_PROGRESS', 'REQUEST_ACCEPTED'] }
+    })
+        .select('-deliveryHandoverCode') // Keep 4-digit code private to the recipient NGO
+        .populate('foodItemDetails.donorId', 'firstName surname city phone')
+        .populate('ngoPreference', 'ngoName address city phone registeredBy')
+        .populate('pickedUpByNgo', 'ngoName address city phone registeredBy')
+        .sort({ updatedAt: -1 });
+
+    res.status(200).json({
+        success: true,
+        count: activeDeliveries.length,
+        deliveries: activeDeliveries
+    });
+});
+
+// Volunteer: Complete handover with 4-digit code validation and carton proof photo upload
+const verifyDeliveryHandover = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { code } = req.body;
+
+    if (!code || code.trim().length !== 4) {
+        res.status(400);
+        throw new Error("A valid 4-digit recipient verification code is required.");
+    }
+
+    if (!req.file) {
+        res.status(400);
+        throw new Error("Drop-off verification photo of food cartons is required.");
+    }
+
+    const donation = await FoodInfo.findById(id)
+        .populate('foodItemDetails.donorId', 'firstName surname email phone')
+        .populate('ngoPreference', 'ngoName address city')
+        .populate('pickedUpByNgo', 'ngoName address city');
+
+    if (!donation) {
+        res.status(404);
+        throw new Error("Delivery record not found.");
+    }
+
+    if (donation.status === 'COMPLETED' || donation.status === 'done') {
+        res.status(400);
+        throw new Error("This delivery has already been finalized.");
+    }
+
+    // Verify 4-digit confirmation code against recipient record
+    if (!donation.deliveryHandoverCode || donation.deliveryHandoverCode.trim() !== code.trim()) {
+        res.status(400);
+        throw new Error("Invalid confirmation code. The code does not match the recipient NGO record.");
+    }
+
+    const photoUrl = getFileUrl(req.file);
+    const completionTimestamp = new Date();
+
+    donation.status = 'COMPLETED';
+    donation.completedAt = completionTimestamp;
+    donation.deliveryHandoverCompletedAt = completionTimestamp;
+    donation.deliveryProofPhoto = photoUrl;
+    donation.deliveredByVolunteer = req.user?._id || null;
+
+    await donation.save();
+
+    // Mark corresponding NgoFoodRequest as fulfilled if linked by verification token
+    if (donation.verificationToken) {
+        const request = await NgoFoodRequest.findOne({ verificationToken: donation.verificationToken.toUpperCase() });
+        if (request && request.status !== 'fulfilled' && request.status !== 'COMPLETED') {
+            request.status = 'COMPLETED';
+            request.fulfilledAt = completionTimestamp;
+            await request.save();
+        }
+    }
+
+    // Trigger tax receipt workflow if applicable
+    try {
+        generateAndEmailReceipt(donation);
+    } catch (err) {
+        console.error("Receipt generation notification error:", err);
+    }
+
+    // Format human-readable timestamp for notifications
+    const formattedTimestamp = completionTimestamp.toLocaleString('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
+
+    // Instantly notify original donor with exact timestamp
+    const donorId = donation.foodItemDetails?.[0]?.donorId?._id || donation.foodItemDetails?.[0]?.donorId;
+    const recipientName = donation.ngoPreference?.ngoName || donation.pickedUpByNgo?.ngoName || 'the recipient NGO';
+
+    if (donorId) {
+        await notify({
+            receiverId: donorId,
+            receiverRole: 'donor',
+            title: 'Food Donation Delivered Safely',
+            message: `Your food donation has arrived safely at ${recipientName} and was confirmed with photo proof at ${formattedTimestamp}.`,
+            type: 'DONATION_COMPLETED',
+            entityType: 'FoodInfo',
+            entityId: donation._id,
+            priority: 'high'
+        });
+    }
+
+    // Notify recipient NGO
+    const ngoUserId = donation.ngoPreference?.registeredBy || donation.pickedUpByNgo?.registeredBy;
+    if (ngoUserId) {
+        await notify({
+            receiverId: ngoUserId,
+            receiverRole: 'ngo',
+            title: 'Drop-off Verified & Completed',
+            message: `Handover for donation #${String(donation._id).slice(-8).toUpperCase()} was successfully verified and completed at ${formattedTimestamp}.`,
+            type: 'DONATION_COMPLETED',
+            entityType: 'FoodInfo',
+            entityId: donation._id,
+            priority: 'medium'
+        });
+    }
+
+    res.status(200).json({
+        success: true,
+        message: "Delivery handover verified and completed successfully.",
+        completionTimestamp,
+        deliveryProofPhoto: photoUrl,
+        donation
+    });
+});
 
 
 

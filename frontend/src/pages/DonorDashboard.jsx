@@ -8,6 +8,8 @@ import { useWallet } from '../context/WalletContext';
 import RatingModal from '../components/RatingModal';
 import RatingSummary from '../components/RatingSummary';
 import ReviewsList from '../components/ReviewsList';
+import ProofModal from '../components/ProofModal';
+import HandoverVerificationModal from '../components/HandoverVerificationModal';
 
 function SkeletonStatCard() {
   return (
@@ -101,6 +103,8 @@ export default function DonorDashboard() {
   const [panFile, setPanFile] = useState(null);
   const [ratingModalDonation, setRatingModalDonation] = useState(null);
   const [userRatingsMap, setUserRatingsMap] = useState({});
+  const [selectedProof, setSelectedProof] = useState(null);
+  const [handoverDelivery, setHandoverDelivery] = useState(null);
 
   const donorId = user?._id || user?.id;
 
@@ -992,6 +996,31 @@ export default function DonorDashboard() {
                         >
                           {downloadingReceiptId === donation._id ? '⏳ Downloading...' : '📄 Download Receipt'}
                         </button>
+
+                        {donation.deliveryProofPhoto && (
+                          <button
+                            className="btn-primary"
+                            style={{
+                              fontSize: '0.78rem',
+                              padding: '7px 14px',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: 'none',
+                              color: '#fff',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6
+                            }}
+                            onClick={() => setSelectedProof({
+                              photoUrl: donation.deliveryProofPhoto,
+                              timestamp: donation.deliveryHandoverCompletedAt || donation.completedAt,
+                              details: donation.ngoPreference?.ngoName || donation.pickedUpByNgo?.ngoName || 'Recipient NGO / Shelter'
+                            })}
+                          >
+                            📸 View Delivery Proof
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -1070,10 +1099,17 @@ export default function DonorDashboard() {
                   )}
 
                   {!['fulfilled', 'completed', 'done'].includes((ful.status || '').toLowerCase()) ? (
-                    <div className="donation-card__actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                    <div className="donation-card__actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
+                      <button 
+                        className="btn-primary" 
+                        style={{ fontSize: '0.8rem', padding: '7px 14px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, borderRadius: 6, fontWeight: 600 }}
+                        onClick={() => setHandoverDelivery(ful)}
+                      >
+                        📦 Complete Handover (Code & Photo)
+                      </button>
                       <button 
                         className="btn-teal" 
-                        style={{ fontSize: '0.8rem', padding: '7px 14px', background: 'var(--grad-purple)', border: 'none', color: '#fff' }}
+                        style={{ fontSize: '0.8rem', padding: '7px 14px', background: 'var(--grad-purple)', border: 'none', color: '#fff', cursor: 'pointer', borderRadius: 6 }}
                         onClick={() => { setPassType('request'); setViewPass(ful); }}
                       >
                         🔑 Delivery Pass
@@ -1410,8 +1446,29 @@ export default function DonorDashboard() {
                 </div>
                 {viewDetails.completedAt && (
                   <div>
-                    <div style={{ color: 'var(--text-muted)' }}>Completed At</div>
+                    <div style={{ color: 'var(--text-muted)' }}>Delivered & Completed At</div>
                     <div style={{ fontWeight: 700, color: 'var(--color-green)' }}>{new Date(viewDetails.completedAt).toLocaleString('en-IN')}</div>
+                  </div>
+                )}
+                {viewDetails.deliveryProofPhoto && (
+                  <div style={{ gridColumn: '1 / -1', marginTop: 10 }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: 6 }}>
+                      📸 Drop-off Verification Proof:
+                    </div>
+                    <div 
+                      onClick={() => setSelectedProof({
+                        photoUrl: viewDetails.deliveryProofPhoto,
+                        timestamp: viewDetails.deliveryHandoverCompletedAt || viewDetails.completedAt,
+                        details: viewDetails.ngoPreference?.ngoName || viewDetails.pickedUpByNgo?.ngoName || 'Recipient NGO / Shelter'
+                      })}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 8, cursor: 'pointer' }}
+                    >
+                      <img src={viewDetails.deliveryProofPhoto} alt="Carton Proof" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6 }} />
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#10b981', fontSize: '0.85rem' }}>View Drop-off Photo</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Click to view full photo proof</div>
+                      </div>
+                    </div>
                   </div>
                 )}
                 <div style={{ gridColumn: '1 / -1', marginTop: 6 }}>
@@ -1516,6 +1573,26 @@ export default function DonorDashboard() {
         onSuccess={() => {
           fetchUserRatings();
           fetchData();
+        }}
+      />
+
+      {/* Proof Modal */}
+      <ProofModal
+        isOpen={!!selectedProof}
+        onClose={() => setSelectedProof(null)}
+        photoUrl={selectedProof?.photoUrl}
+        timestamp={selectedProof?.timestamp}
+        details={selectedProof?.details}
+      />
+
+      {/* Volunteer Delivery Handover Modal */}
+      <HandoverVerificationModal
+        isOpen={!!handoverDelivery}
+        delivery={handoverDelivery}
+        onClose={() => setHandoverDelivery(null)}
+        onSuccess={() => {
+          fetchData();
+          setHandoverDelivery(null);
         }}
       />
     </div>

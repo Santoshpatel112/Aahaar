@@ -9,6 +9,8 @@ import { ethers } from 'ethers';
 import RatingModal from '../components/RatingModal';
 import RatingSummary from '../components/RatingSummary';
 import ReviewsList from '../components/ReviewsList';
+import HandoverVerificationModal from '../components/HandoverVerificationModal';
+import ProofModal from '../components/ProofModal';
 
 
 const FOOD_CATEGORIES = [
@@ -229,6 +231,8 @@ export default function NgoDashboard() {
   // Rating Modal States
   const [ratingModalDonation, setRatingModalDonation] = useState(null);
   const [userRatingsMap, setUserRatingsMap] = useState({});
+  const [handoverDelivery, setHandoverDelivery] = useState(null);
+  const [selectedProof, setSelectedProof] = useState(null);
 
   const fetchUserRatings = useCallback(async () => {
     try {
@@ -1524,10 +1528,48 @@ export default function NgoDashboard() {
                           <div>Email: <strong>{donorEmail}</strong></div>
                         </div>
 
-                        {/* Verify pickup — NGO asks the donor for the code, no code shown here */}
+                        {/* Recipient Drop-off 4-Digit Confirmation Code */}
+                        {isAccepted && (
+                          <div style={{
+                            marginTop: 12,
+                            padding: '14px 18px',
+                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            borderRadius: 10,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 12
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                🔑 Recipient Drop-off Confirmation Code
+                              </div>
+                              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                                Provide this 4-digit code to the volunteer delivering your food to confirm physical drop-off.
+                              </div>
+                            </div>
+                            <div style={{
+                              background: 'var(--bg-card, #1e293b)',
+                              padding: '8px 18px',
+                              borderRadius: 8,
+                              border: '2px dashed #10b981',
+                              fontSize: '1.4rem',
+                              fontWeight: 800,
+                              letterSpacing: '0.35em',
+                              color: '#34d399',
+                              fontFamily: 'monospace'
+                            }}>
+                              {donation.deliveryHandoverCode || '----'}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Verify pickup info prompt */}
                         {isAccepted && (
                           <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.15)', borderRadius: 8, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                            💡 Ask the donor to show their <strong style={{ color: 'var(--color-teal)' }}>Pickup Pass</strong> (QR or 6-digit code). Scan or enter it below to verify.
+                            💡 Ask the donor to show their <strong style={{ color: 'var(--color-teal)' }}>Pickup Pass</strong> (QR or 6-digit code), or complete handover verification below with proof photo.
                           </div>
                         )}
 
@@ -1551,12 +1593,31 @@ export default function NgoDashboard() {
                           </div>
                         )}
 
-                        {/* Verify pickup button — opens scanner with blank token so NGO must ask donor */}
+                        {/* Verification actions */}
                         {isAccepted && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14, borderTop: '1px solid var(--border-color)', paddingTop: 12, flexWrap: 'wrap' }}>
                             <button
                               className="btn-primary"
-                              style={{ fontSize: '0.8rem', padding: '7px 16px', background: 'var(--grad-teal)', border: 'none', color: '#fff' }}
+                              style={{
+                                fontSize: '0.8rem',
+                                padding: '7px 16px',
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                border: 'none',
+                                color: '#fff',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6
+                              }}
+                              onClick={() => setHandoverDelivery(donation)}
+                            >
+                              📦 Complete Handover (Photo + 4-Digit Code)
+                            </button>
+                            <button
+                              className="btn-ghost"
+                              style={{ fontSize: '0.8rem', padding: '7px 14px' }}
                               onClick={() => {
                                 setScannerOpen(true);
                                 setVerifyTab('scan');
@@ -1565,14 +1626,38 @@ export default function NgoDashboard() {
                                 setVerifyingRequestId(null);
                               }}
                             >
-                              📷 Verify Pickup
+                              📷 Scan Donor QR
                             </button>
                           </div>
                         )}
 
-                        {/* Rate Donor for Completed Donations */}
+                        {/* Rate Donor & View Handover Proof for Completed Donations */}
                         {isCompleted && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14, borderTop: '1px solid var(--border-color)', paddingTop: 12, flexWrap: 'wrap' }}>
+                            {donation.deliveryProofPhoto && (
+                              <button
+                                type="button"
+                                className="btn-ghost"
+                                style={{
+                                  fontSize: '0.78rem',
+                                  padding: '6px 12px',
+                                  color: 'var(--color-green, #10b981)',
+                                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6
+                                }}
+                                onClick={() => setSelectedProof({
+                                  photoUrl: donation.deliveryProofPhoto,
+                                  timestamp: donation.deliveryHandoverCompletedAt || donation.completedAt,
+                                  details: donation.contactDetails?.fullAddress
+                                })}
+                              >
+                                📸 View Handover Proof
+                              </button>
+                            )}
                             {userRatingsMap[donation._id] ? (
                               <span
                                 style={{
@@ -2037,6 +2122,26 @@ export default function NgoDashboard() {
           fetchUserRatings();
           fetchData();
         }}
+      />
+
+      {/* Volunteer Delivery Handover Modal */}
+      <HandoverVerificationModal
+        isOpen={!!handoverDelivery}
+        delivery={handoverDelivery}
+        onClose={() => setHandoverDelivery(null)}
+        onSuccess={() => {
+          fetchData();
+          setHandoverDelivery(null);
+        }}
+      />
+
+      {/* Handover Proof Viewer Modal */}
+      <ProofModal
+        isOpen={!!selectedProof}
+        photoUrl={selectedProof?.photoUrl}
+        timestamp={selectedProof?.timestamp}
+        details={selectedProof?.details}
+        onClose={() => setSelectedProof(null)}
       />
     </div>
   );
