@@ -23,17 +23,17 @@ test('Rating Controller - Participant Resolution', async (t) => {
     const donation = {
       _id: new mongoose.Types.ObjectId(),
       status: 'COMPLETED',
-      foodItemDetails: [{ 
+      foodItemDetails: [{
         donorId: {
           _id: donorId,
           firstName: 'Rahul',
           surname: 'Verma'
         }
       }],
-      pickedUpByNgo: { 
-        _id: ngoId, 
+      pickedUpByNgo: {
+        _id: ngoId,
         ngoName: 'Feeding Hope Foundation',
-        registeredBy: ngoUserId 
+        registeredBy: ngoUserId
       },
     };
 
@@ -56,10 +56,10 @@ test('Rating Controller - Participant Resolution', async (t) => {
         firstName: 'Ananya',
         surname: 'Singh'
       },
-      ngoId: { 
-        _id: ngoId, 
+      ngoId: {
+        _id: ngoId,
         ngoName: 'Seva Trust',
-        registeredBy: { _id: ngoUserId } 
+        registeredBy: { _id: ngoUserId }
       },
     };
 
@@ -72,3 +72,5 @@ test('Rating Controller - Participant Resolution', async (t) => {
     assert.equal(res.ngoRegisteredBy, ngoUserId.toString());
   });
 });
+
+// new testing
